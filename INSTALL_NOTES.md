@@ -75,14 +75,3 @@ Cómo revertir
   ```bash
   rm ~/.local/share/applications/linux-wallpaper-engine-features.desktop
   ```
-
-¿Quieres que pruebe el instalador en modo `--dry-run` o que ejecute una instalación en un entorno controlado (si me indicas que lo haga)?
-
----
-
-Si quieres, puedo ahora:
-- Ejecutar un `--dry-run` (no cambia nada) y mostrar la salida aquí.
-- Añadir una sección en `README.md` explicando las flags del instalador.
-- Implementar comprobaciones adicionales (por ejemplo, verificar que `linux-wallpaperengine` arranca correctamente).
-
-Si prefieres, procedo con la siguiente tarea planificada (me indicas cuál).
