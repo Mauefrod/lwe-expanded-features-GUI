@@ -67,4 +67,5 @@ requirements.lock.txt
 # Local install notes / developer scratch file
 INSTALL_NOTES.md
 /config.json
+source/core/config.json
 # End of file
