@@ -15,7 +15,8 @@ class GalleryManager:
         self.gallery_view.clear_gallery()
         
         root_dir = self.config["--dir"]
-        if not root_dir:
+        # Validar que el directorio existe y es accesible
+        if not root_dir or not path.exists(root_dir) or not path.isdir(root_dir):
             self.gallery_view.item_list = []
             return
         

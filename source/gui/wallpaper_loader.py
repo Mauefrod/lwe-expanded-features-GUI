@@ -51,54 +51,63 @@ class WallpaperLoader:
 
 def count_all_wallpapers(root_dir, loader):
     """Cuenta todos los wallpapers con preview"""
-    if not root_dir:
+    if not root_dir or not path.exists(root_dir) or not path.isdir(root_dir):
         return 0
-    count = 0
-    for w in listdir(root_dir):
-        folder = path.join(root_dir, w)
-        if not path.isdir(folder):
-            continue
-        if loader.load_preview(folder):
-            count += 1
-    return count
+    try:
+        count = 0
+        for w in listdir(root_dir):
+            folder = path.join(root_dir, w)
+            if not path.isdir(folder):
+                continue
+            if loader.load_preview(folder):
+                count += 1
+        return count
+    except (OSError, PermissionError):
+        return 0
 
 
 def count_favorite_wallpapers(root_dir, favorites, loader):
     """Cuenta los wallpapers favoritos con preview"""
-    if not root_dir:
+    if not root_dir or not path.exists(root_dir) or not path.isdir(root_dir):
         return 0
-    favs = set(favorites)
-    count = 0
-    for w in listdir(root_dir):
-        folder = path.join(root_dir, w)
-        if not path.isdir(folder):
-            continue
-        if w in favs and loader.load_preview(folder):
-            count += 1
-    return count
+    try:
+        favs = set(favorites)
+        count = 0
+        for w in listdir(root_dir):
+            folder = path.join(root_dir, w)
+            if not path.isdir(folder):
+                continue
+            if w in favs and loader.load_preview(folder):
+                count += 1
+        return count
+    except (OSError, PermissionError):
+        return 0
 
 
 def get_wallpapers_list(root_dir, loader, group=None, favorites=None, groups_dict=None):
     """Obtiene la lista de wallpapers según el grupo seleccionado"""
-    if not root_dir:
+    if not root_dir or not path.exists(root_dir) or not path.isdir(root_dir):
         return []
     
-    # Primero: todos los wallpapers válidos (con preview)
-    all_with_preview = []
-    for w in listdir(root_dir):
-        folder = path.join(root_dir, w)
-        if not path.isdir(folder):
-            continue
-        if loader.load_preview(folder):
-            all_with_preview.append(w)
-    
-    if group is None or group == "__ALL__":
-        return all_with_preview
-    
-    elif group == "__FAVORITES__":
-        favs = set(favorites or [])
-        return [w for w in all_with_preview if w in favs]
-    
-    else:
-        group_list = (groups_dict or {}).get(group, [])
-        return [w for w in all_with_preview if w in group_list]
+    try:
+        # Primero: todos los wallpapers válidos (con preview)
+        all_with_preview = []
+        for w in listdir(root_dir):
+            folder = path.join(root_dir, w)
+            if not path.isdir(folder):
+                continue
+            if loader.load_preview(folder):
+                all_with_preview.append(w)
+        
+        if group is None or group == "__ALL__":
+            return all_with_preview
+        
+        elif group == "__FAVORITES__":
+            favs = set(favorites or [])
+            return [w for w in all_with_preview if w in favs]
+        
+        else:
+            group_list = (groups_dict or {}).get(group, [])
+            return [w for w in all_with_preview if w in group_list]
+    except (OSError, PermissionError):
+        return []

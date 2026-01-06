@@ -84,7 +84,12 @@ class WallpaperEngineGUI:
         config = load_config()
         merge_config(DEFAULT_CONFIG, config)
         if DEFAULT_CONFIG["--dir"]:
-            DEFAULT_CONFIG["--dir"] = path.expanduser(DEFAULT_CONFIG["--dir"])
+            expanded_dir = path.expanduser(DEFAULT_CONFIG["--dir"])
+            # Si el directorio no existe, limpiar el config
+            if path.exists(expanded_dir) and path.isdir(expanded_dir):
+                DEFAULT_CONFIG["--dir"] = expanded_dir
+            else:
+                DEFAULT_CONFIG["--dir"] = ""
 
     
     def _create_ui(self):
