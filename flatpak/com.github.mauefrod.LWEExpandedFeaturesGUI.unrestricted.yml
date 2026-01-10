@@ -301,6 +301,7 @@ modules:
       - chmod +x /app/share/lwe-gui/source/core/main.sh || true
       - chmod +x /app/share/lwe-gui/source/core/lwe-state-manager.sh || true
       - chmod +x /app/share/lwe-gui/source/core/window-monitor.sh || true
+      - chmod +x /app/share/lwe-gui/source/core/async-window-fixer.sh || true
       - test -f /app/share/lwe-gui/source/run.sh && chmod +x /app/share/lwe-gui/source/run.sh || true
       - install -Dm755 lwe-gui-wrapper.sh /app/bin/lwe-gui
       - install -Dm755 lwe-window-manager.sh /app/bin/lwe-window-manager.sh
