@@ -234,7 +234,13 @@ class EventHandlers:
             self.ui['on_execute']()
     
     def on_stop(self):
-        """Detiene el engine"""
+        """
+        Stop the background engine and associated loops.
+        
+        Invokes the packaged stop script and blocks until that process completes; logs both the initiation and completion of the stop command.
+        """
         self.log("[GUI] Stopping engine and loops")
         script_path = path.join(path.dirname(__file__), "..", "..", "core", "main.sh")
-        Popen([script_path, "--stop"])
+        proc = Popen([script_path, "--stop"])
+        proc.wait()  # Wait for process to complete
+        self.log("[GUI] Engine stop command completed")
