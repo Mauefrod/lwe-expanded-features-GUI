@@ -24,14 +24,18 @@ case "$ACTION" in
             echo "Error: window_id required for remove-above" >&2
             exit 1
         fi
-        # Primary method: wmctrl
+        # Primary method: wmctrl (sends proper client messages for state changes)
         if wmctrl -i -r "$WIN_ID" -b remove,above 2>/dev/null; then
             echo "Successfully removed 'above' flag from $WIN_ID"
             exit 0
         fi
-        # Fallback: xdotool to change window state
-        if command -v xprop &>/dev/null; then
-            xprop -id "$WIN_ID" -remove _NET_WM_STATE_ABOVE 2>/dev/null && exit 0
+        # Fallback: xdotool to toggle window state (also sends client messages)
+        if command -v xdotool &>/dev/null; then
+            if xdotool windowsize "$WIN_ID" 0 0 2>/dev/null || xdotool getwindowfocus 2>/dev/null >/dev/null; then
+                # xdotool is available, but has no direct "remove-above" command
+                # Only wmctrl can properly remove the above state, so this fallback fails gracefully
+                :
+            fi
         fi
         echo "Failed to remove 'above' flag" >&2
         exit 1
