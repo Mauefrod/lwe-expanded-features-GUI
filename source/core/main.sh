@@ -160,53 +160,66 @@ kill_previous_engine() {
 cmd_stop() {
     log "Stopping ALL wallpaper engine processes and loops"
 
-    # First, get windows to close them gracefully
-    local -a engine_windows
+    # First, try to close windows gracefully (if wmctrl works)
+    local -a engine_windows=()
     mapfile -t engine_windows < <(get_engine_windows)
     
-    # Close windows gracefully first
-    for win in "${engine_windows[@]:-}"; do
-        if [[ -n "$win" ]]; then
-            log "Closing window: $win"
-            if run_window_manager "close-window" "$win" &>/dev/null; then
-                log "Successfully closed window $win"
-            else
-                # Fallback to direct wmctrl
-                wmctrl -i -c "$win" 2>/dev/null || log "Warning: Could not close window $win"
+    # Close windows gracefully first (skip empty/none values)
+    if [[ ${#engine_windows[@]} -gt 0 ]]; then
+        for win in "${engine_windows[@]}"; do
+            if [[ -n "$win" ]] && [[ "$win" != "none" ]]; then
+                log "Attempting to close window: $win"
+                if run_window_manager "close-window" "$win" &>/dev/null; then
+                    log "Successfully closed window $win"
+                else
+                    # Fallback to direct wmctrl
+                    wmctrl -i -c "$win" 2>/dev/null || true
+                fi
             fi
-        fi
-    done
+        done
+    else
+        log "No windows to close (array empty)"
+    fi
     
     sleep 1
 
     # Kill engine processes (aggressive approach)
     log "Force killing engine processes"
     pkill -9 -f linux-wallpaperengine 2>/dev/null || true
-    pkill -9 -f "linux-wallpaperengine" 2>/dev/null || true
-
+    
     # Kill loop process if exists
     if [[ -f "$PID_FILE" ]]; then
-        local loop_pid=$(cat "$PID_FILE" 2>/dev/null || echo "")
+        local loop_pid
+        loop_pid=$(cat "$PID_FILE" 2>/dev/null || echo "")
         if [[ -n "$loop_pid" ]]; then
             log "Killing loop process with PID: $loop_pid"
-            kill -9 "$loop_pid" 2>/dev/null || true
-            sleep 0.5
+            # Try TERM first, then KILL
+            kill -TERM "$loop_pid" 2>/dev/null || true
+            sleep 0.2
+            if kill -0 "$loop_pid" 2>/dev/null; then
+                log "Loop process still alive, using SIGKILL"
+                kill -9 "$loop_pid" 2>/dev/null || true
+            fi
+            sleep 0.3
             # Verify it's dead
             if kill -0 "$loop_pid" 2>/dev/null; then
-                log "WARNING: Loop process $loop_pid still alive, trying more aggressive approach"
-                pkill -9 -f "main.sh" 2>/dev/null || true
+                log "ERROR: Loop process $loop_pid still alive after SIGKILL, this should not happen"
+                # Last resort: pkill by exact PID
+                pkill -9 -P "$loop_pid" 2>/dev/null || true
+            else
+                log "Loop process successfully killed"
             fi
         fi
         rm -f "$PID_FILE"
     fi
     
-    # Final cleanup: kill any remaining main.sh instances
+    # Final cleanup: kill any remaining main.sh instances (the loop script)
     pkill -9 -f "bash.*main.sh" 2>/dev/null || true
     
     # Clear state files
     rm -f "$PREV_WINDOWS_FILE" "$ENGINE_STATE_FILE.pid" 2>/dev/null || true
     
-    log "Stop command completed"
+    log "Stop command completed - all processes should be terminated"
 }
 
 
