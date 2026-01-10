@@ -2,7 +2,7 @@
 # window-monitor.sh
 # Background daemon to monitor and manipulate LWE windows
 # ULTRA-ASYNC MODE: Launches all window manipulation attempts in parallel non-blocking subprocesses
-# Never waits for wmctrl or flatpak-enter to complete
+# Never waits for wmctrl to complete
 # Uses timeouts to prevent Flatpak from blocking the monitor itself
 #
 # Usage: window-monitor.sh <pid> <remove_above> [log_file] [app_id]
@@ -43,6 +43,7 @@ while [[ $attempt -lt $max_attempts ]]; do
         # Launch async window fixing in background, don't wait for it
         {
             # Try direct wmctrl (non-blocking)
+            # This works because Flatpak has X11 socket forwarding
             if command -v wmctrl >/dev/null 2>&1; then
                 timeout 1 bash -c 'wmctrl -lx 2>/dev/null | grep -i "linux-wallpaperengine\|wallpaperengine\|steam_app_431960" | awk "{print \$1}" | while read -r win; do
                     timeout 0.5 wmctrl -i -r "$win" -b remove,above 2>/dev/null &
@@ -50,16 +51,6 @@ while [[ $attempt -lt $max_attempts ]]; do
                     timeout 0.5 wmctrl -i -r "$win" -b add,below 2>/dev/null &
                 done
                 wait' 2>/dev/null || true
-            fi
-            
-            # Try flatpak-enter if available (non-blocking)
-            if [[ -n "$FLATPAK_APP_ID" ]] && command -v flatpak-enter >/dev/null 2>&1; then
-                timeout 1 bash -c "flatpak-enter $ENGINE_PID wmctrl -lx 2>/dev/null | grep -i 'linux-wallpaperengine\|wallpaperengine\|steam_app_431960' | awk '{print \$1}' | while read -r win; do
-                    timeout 0.5 flatpak-enter $ENGINE_PID wmctrl -i -r \"\$win\" -b remove,above 2>/dev/null &
-                    timeout 0.5 flatpak-enter $ENGINE_PID wmctrl -i -r \"\$win\" -b add,skip_pager 2>/dev/null &
-                    timeout 0.5 flatpak-enter $ENGINE_PID wmctrl -i -r \"\$win\" -b add,below 2>/dev/null &
-                done
-                wait" 2>/dev/null || true
             fi
         } &
         
