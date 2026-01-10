@@ -1,9 +1,25 @@
 #!/bin/bash
 set -euo pipefail
 
-LOG_FILE="$HOME/.local/share/linux-wallpaper-engine-features/logs.txt"
-PID_FILE="$HOME/.local/share/linux-wallpaper-engine-features/loop.pid"
-mkdir -p "$(dirname "$LOG_FILE")"
+# Support both Flatpak and native installations
+DATA_DIR="${LWE_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/linux-wallpaper-engine-features}"
+CONFIG_DIR="${LWE_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/linux-wallpaper-engine-features}"
+
+LOG_FILE="$DATA_DIR/logs.txt"
+PID_FILE="$DATA_DIR/loop.pid"
+
+# Ensure directories exist
+mkdir -p "$DATA_DIR" "$CONFIG_DIR"
+
+# Detectar si estamos en Flatpak
+if [ -f /.flatpak-info ]; then
+    IN_FLATPAK=true
+    # Funciones wrapper para ejecutar comandos en el host
+    wmctrl() { flatpak-spawn --host wmctrl "$@"; }
+    xdotool() { flatpak-spawn --host xdotool "$@"; }
+else
+    IN_FLATPAK=false
+fi
 
 POOL=()
 ENGINE=linux-wallpaperengine
@@ -20,6 +36,7 @@ log() {
 }
 
 log "==================== NEW EXECUTION ===================="
+log "Running in Flatpak: $IN_FLATPAK"
 
 
 ###############################################
@@ -66,7 +83,7 @@ wait_for_window() {
     
     for i in {1..200}; do
         local -a current_windows=()
-        mapfile -t current_windows < <(wmctrl -lx | grep -i "linux-wallpaperengine\|wallpaperengine\|steam_app_431960" | awk '{print $1}')
+        mapfile -t current_windows < <(wmctrl -lx 2>/dev/null | grep -i "linux-wallpaperengine\|wallpaperengine\|steam_app_431960" | awk '{print $1}' || true)
         
         # Buscar ventana que NO esté en la lista de exclusión
         for w in "${current_windows[@]}"; do
@@ -104,15 +121,20 @@ apply_window_flags() {
         return
     fi
 
-    log "Applying window flags to $win_id"
+    log "Applying window flags to $win_id (Flatpak: $IN_FLATPAK)"
     
-    wmctrl -i -r "$win_id" -b remove,above
-    wmctrl -i -r "$win_id" -b add,skip_pager
-    wmctrl -i -r "$win_id" -b add,below
+    if wmctrl -i -r "$win_id" -b remove,above 2>/dev/null; then
+        log "Successfully removed 'above' flag"
+    else
+        log "WARNING: Failed to remove 'above' flag"
+    fi
+    
+    wmctrl -i -r "$win_id" -b add,skip_pager 2>/dev/null || log "WARNING: Failed to add 'skip_pager'"
+    wmctrl -i -r "$win_id" -b add,below 2>/dev/null || log "WARNING: Failed to add 'below'"
 
     if [[ -n "$ACTIVE_WIN" ]]; then
         log "Restoring focus to previous window: $ACTIVE_WIN"
-        xdotool windowactivate "$ACTIVE_WIN" 2>/dev/null || true
+        xdotool windowactivate "$ACTIVE_WIN" 2>/dev/null || log "WARNING: Failed to restore focus"
     fi
 }
 
@@ -127,7 +149,7 @@ apply_wallpaper() {
 
     # Guardamos las ventanas actuales del engine ANTES de lanzar el nuevo
     local old_windows=()
-    mapfile -t old_windows < <(wmctrl -lx | grep -i "linux-wallpaperengine\|wallpaperengine\|steam_app_431960" | awk '{print $1}')
+    mapfile -t old_windows < <(wmctrl -lx 2>/dev/null | grep -i "linux-wallpaperengine\|wallpaperengine\|steam_app_431960" | awk '{print $1}' || true)
     log "Old engine windows: ${old_windows[*]:-none}"
 
     ACTIVE_WIN=$(xdotool getactivewindow 2>/dev/null || echo "")
