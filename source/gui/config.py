@@ -41,7 +41,6 @@ DEFAULT_CONFIG = {
     },
     "--sound": {
         "silent": False,
-        "volume": None,  # None o valor entre 0-100
         "noautomute": False,
         "no_audio_processing": False
     },
