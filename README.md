@@ -352,6 +352,8 @@ The application follows an MVC-like pattern:
 
 </details>
 
+---
+
 
 ## 🐛 Troubleshooting
 
