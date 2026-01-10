@@ -1,0 +1,12 @@
+[Desktop Entry]
+Name=Linux Wallpaper Engine GUI
+GenericName=Wallpaper Manager
+Comment=Manage and apply dynamic wallpapers on Linux with an intuitive GUI
+Exec=lwe-gui
+Icon=com.github.mauefrod.LWEExpandedFeaturesGUI
+Terminal=false
+Type=Application
+Categories=Utility;Graphics;DesktopSettings;
+Keywords=wallpaper;background;desktop;dynamic;engine;
+StartupNotify=true
+X-Flatpak-RenamedFrom=lwe-gui.desktop;

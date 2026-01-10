@@ -395,7 +395,7 @@ This project builds upon and extends:
 - The Wallpaper Engine community for creating amazing wallpapers
 - The linux-wallpaperengine project for making this possible on Linux
 - All contributors and users providing feedback and improvements
-
+- APP icon used under license. Atributed to: <a href="https://www.flaticon.es/iconos-gratis/marcador-de-posicion-de-imagen" title="marcador de posición de imagen iconos">Marcador de posición de imagen iconos creados por Anggara - Flaticon</a>
 ---
 
 ## 📄 License
