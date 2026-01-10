@@ -8,7 +8,6 @@ finish-args:
   - --socket=x11
   - --share=ipc
   - --socket=wayland
-  - --filesystem=home
   - --filesystem=xdg-config/linux-wallpaper-engine-features:create
   - --filesystem=xdg-data/linux-wallpaper-engine-features:create
   - --share=network
@@ -16,15 +15,11 @@ finish-args:
   - --filesystem=~/.local/share/Steam:ro
   - --socket=pulseaudio
   - --device=dri
-  - --device=all
   - --talk-name=org.freedesktop.Notifications
   - --env=DBUS_FATAL_WARNINGS=0
-  - --filesystem=host
   - --filesystem=/tmp
   - --env=XAUTHORITY=$HOME/.Xauthority
   - --socket=session-bus
-  - --socket=system-bus
-
 
 modules:
   - name: glu
