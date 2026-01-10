@@ -21,7 +21,6 @@
 ## 📖 About
 
 <details>
-<summary>📖 About</summary>
 
 **Linux Wallpaper Engine GUI** is a desktop application that provides an intuitive and feature-rich interface for managing and applying dynamic wallpapers on Linux systems. It leverages the power of [linux-wallpaperengine](https://github.com/Acters/linux-wallpaperengine) to bring the Wallpaper Engine experience to Linux users with additional GUI enhancements, organization tools, and automation features.
 </details>
@@ -33,7 +32,6 @@
 ## ✨ Features
 
 <details>
-<summary>✨ Features</summary>
 
 - 🖼️ **Visual Gallery** - Browse wallpapers with thumbnail previews
 - 📁 **Group Organization** - Create and manage wallpaper groups/collections
