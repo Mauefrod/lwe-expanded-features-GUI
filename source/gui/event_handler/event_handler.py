@@ -1,5 +1,5 @@
 from tkinter import filedialog, messagebox, Toplevel, Label, Frame, Button, ttk
-from subprocess import Popen
+from subprocess import Popen, DEVNULL
 from os import path
 import os
 from gui.config import update_set_flag, save_config
@@ -286,7 +286,7 @@ class EventHandlers:
                 messagebox.showerror("Error", f"Script not found at: {script_path}")
                 return
             
-            proc = Popen([script_path, "--stop"], stdout=os.DEVNULL, stderr=os.DEVNULL)
+            proc = Popen([script_path, "--stop"], stdout=DEVNULL, stderr=DEVNULL)
             # Use a thread to wait and log completion without blocking GUI
             import threading
             def wait_and_log():
