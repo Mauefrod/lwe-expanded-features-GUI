@@ -363,6 +363,21 @@ apply_wallpaper() {
     "$ENGINE" "${full_args[@]}" &
     local new_pid=$!
     log "Engine launched with PID $new_pid, args: $ENGINE ${full_args[*]}"
+    
+    # Start background monitor to continuously try to apply window flags
+    # This is a workaround for Flatpak restrictions on wmctrl
+    if [[ "$REMOVE_ABOVE" == "true" ]]; then
+        local monitor_script
+        monitor_script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/window-monitor.sh"
+        if [[ -f "$monitor_script" ]]; then
+            log "Starting background window monitor (REMOVE_ABOVE=true)"
+            bash "$monitor_script" "$new_pid" "$REMOVE_ABOVE" "$LOG_FILE" &
+            local monitor_pid=$!
+            log "Window monitor started with PID $monitor_pid"
+        else
+            log "WARNING: window-monitor.sh not found at $monitor_script"
+        fi
+    fi
 
     # Esperamos a que la NUEVA ventana esté lista (excluyendo las antiguas)
     local win_id
