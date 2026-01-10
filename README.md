@@ -16,10 +16,7 @@
 [Contributing](#-contributing)
 
 </div>
-### 📖 About
-
-
----
+## 📖 About
 
 <details>
 <summary>📖 About</summary>
