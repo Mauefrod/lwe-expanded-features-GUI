@@ -198,11 +198,6 @@ class WallpaperEngineGUI:
         self.sound_panel.silent_checkbox.config(
             command=self.event_handlers.on_silent_changed
         )
-        """VOlUME PANEL NOT WORKING
-        REFER TO CLOSED ISSUE ON VOLUME PANEL"""
-        # self.sound_panel.volume_slider.config(
-            #command=self.event_handlers.on_volume_changed
-        #)
         self.sound_panel.noautomute_checkbox.config(
             command=self.event_handlers.on_noautomute_changed
         )
@@ -259,15 +254,6 @@ class WallpaperEngineGUI:
         self.sound_panel.silent.set(sound_config.get("silent", False))
         self.sound_panel.noautomute.set(sound_config.get("noautomute", False))
         self.sound_panel.no_audio_processing.set(sound_config.get("no_audio_processing", False))
-        
-        """VOLUMEN PANEL"""
-        """Actualmente el Panel de volumen está ocasionando behaviour muy raro, como por ejemplo ignorar el flag de --above, 
-        crear subprocesos huérfanos, y realmente tampoco está modificando el volumen real. Se mantendrá como un issue cerrado, 
-        ya que no planeo implementar un control de volumen manualmente... (existe el mezclador de audio del entorno gráfico)."""
-        # Volumen (None significa que no se especifica)
-        # volume = sound_config.get("volume")
-        # if volume is not None:
-        #    self.sound_panel.set_volume(volume)
         
         # Calcular columnas iniciales para la galería según el tamaño estático de thumbnail
         try:

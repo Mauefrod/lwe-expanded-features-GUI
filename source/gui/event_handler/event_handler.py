@@ -142,27 +142,8 @@ class EventHandlers:
         save_config(self.config)
         
         # Re-aplicar el wallpaper actual si hay uno activo
-        current_wallpaper = self.config.get("--set", {}).get("wallpaper")
-        if current_wallpaper:
-            self.log(f"[HANDLER] Re-applying current wallpaper with new sound settings")
-            if self.ui.get('on_execute'):
-                self.ui['on_execute']()
-    
-    """VOLUME PANEL NOT WORKING. REFER TO CLOSED ISSUE."""
-    # def on_volume_changed(self, value):
-    #    """Maneja el cambio del slider de volumen"""
-    #    sound_panel = self.ui['sound_panel']
-    #    volume = sound_panel.get_volume()
-    #    self.config["--sound"]["volume"] = volume
-    #    self.log(f"[HANDLER] Volume set to: {volume}")
-    #    save_config(self.config)
-        
-        # Re-aplicar el wallpaper actual si hay uno activo
-    #    current_wallpaper = self.config.get("--set", {}).get("wallpaper")
-    #    if current_wallpaper:
-    #        self.log(f"[HANDLER] Re-applying current wallpaper with new volume")
-    #        if self.ui.get('on_execute'):
-    #            self.ui['on_execute']()
+        if self.ui.get('on_execute'):
+            self.ui['on_execute']()
     
     def on_noautomute_changed(self):
         """Maneja el cambio del checkbox No Auto Mute"""
@@ -172,11 +153,8 @@ class EventHandlers:
         save_config(self.config)
         
         # Re-aplicar el wallpaper actual si hay uno activo
-        current_wallpaper = self.config.get("--set", {}).get("wallpaper")
-        if current_wallpaper:
-            self.log(f"[HANDLER] Re-applying current wallpaper with new sound settings")
-            if self.ui.get('on_execute'):
-                self.ui['on_execute']()
+        if self.ui.get('on_execute'):
+            self.ui['on_execute']()
     
     def on_audio_processing_changed(self):
         """Maneja el cambio del checkbox No Audio Processing"""
@@ -186,11 +164,8 @@ class EventHandlers:
         save_config(self.config)
         
         # Re-aplicar el wallpaper actual si hay uno activo
-        current_wallpaper = self.config.get("--set", {}).get("wallpaper")
-        if current_wallpaper:
-            self.log(f"[HANDLER] Re-applying current wallpaper with new sound settings")
-            if self.ui.get('on_execute'):
-                self.ui['on_execute']()
+        if self.ui.get('on_execute'):
+            self.ui['on_execute']()
 
     
     # ========== Resolución ==========
