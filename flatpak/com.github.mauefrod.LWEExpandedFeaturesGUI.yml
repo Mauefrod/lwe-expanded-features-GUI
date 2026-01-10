@@ -45,6 +45,8 @@ finish-args:
   # Session and system bus sockets for inter-process communication
   - --socket=session-bus
   - --socket=system-bus
+    # Steam Flatpak Install
+  - --filesystem=~/.var/app/com.valvesoftware.Steam:ro
   # Development mode for additional capabilities (wmctrl/xdotool window manipulation)
   # This is necessary for the flags --delay, --random, --above to work properly
   - --allow=devel
