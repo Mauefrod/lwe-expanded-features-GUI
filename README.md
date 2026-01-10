@@ -188,7 +188,7 @@ Build and install locally with `flatpak-builder` (developer machine):
 
 ```bash
 # build and install for the current user
-flatpak-builder --user --install --force-clean build-dir flatpak/x86_64-com.github.mauefrod.LWEExpandedFeaturesGUI.yml
+flatpak-builder --user --install --force-clean build-dir com.github.mauefrod.LWEExpandedFeaturesGUI.yml
 
 # run the installed Flatpak
 flatpak run com.github.mauefrod.LWEExpandedFeaturesGUI
