@@ -202,20 +202,6 @@ def build_args(config, log_callback=None, show_gui_warning=False):
         if sound_config.get("silent", False):
             sound_flags.append("--silent")
         
-        # --volume
-        volume = sound_config.get("volume")
-        if volume is not None:
-            # Validar que el volumen esté en el rango correcto
-            try:
-                volume_int = int(volume)
-                if 0 <= volume_int <= 100:
-                    sound_flags.extend(["--volume", str(volume_int)])
-                elif log_callback:
-                    log_callback(f"[WARNING] Invalid volume value: {volume} (must be 0-100)")
-            except (ValueError, TypeError):
-                if log_callback:
-                    log_callback(f"[WARNING] Invalid volume format: {volume}")
-        
         # --noautomute
         if sound_config.get("noautomute", False):
             sound_flags.append("--noautomute")
