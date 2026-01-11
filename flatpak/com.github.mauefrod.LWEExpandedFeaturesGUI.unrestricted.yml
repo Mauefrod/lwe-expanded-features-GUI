@@ -169,9 +169,9 @@ modules:
     buildsystem: meson
     install: true
     config-opts:
-      - -Dvulkan=disabled
-      - -Dshaderc=disabled
-      - -Dglslang=disabled
+      - -Dvulkan=enabled
+      - -Dshaderc=enabled
+      - -Dglslang=enabled
       - -Ddemos=false
       - -Dopengl=enabled
     sources:
