@@ -162,14 +162,12 @@ modules:
       - -Dglslang=enabled
       - -Ddemos=false
       - -Dopengl=enabled
-    post-install:
-      - ls -la /app/lib/pkgconfig/libplacebo.pc
-      - pkg-config --modversion libplacebo
+      - --libdir=lib  # Force installation to /app/lib instead of /app/lib64
     sources:
       - type: git
         url: https://code.videolan.org/videolan/libplacebo.git
         tag: v6.338.2
-        
+          
   - name: mpv
     buildsystem: meson
     config-opts:
