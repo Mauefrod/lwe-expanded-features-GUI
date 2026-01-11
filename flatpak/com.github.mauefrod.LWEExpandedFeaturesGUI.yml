@@ -96,6 +96,16 @@ modules:
     build-commands:
       - make
       - make install GLEW_DEST=/app
+      - echo "=== GLEW files installed ==="
+      - find /app -name "libGLEW*"
+      - |
+        if [ -f /app/lib64/libGLEW.so.2.2.0 ]; then
+          mkdir -p /app/lib
+          cp -a /app/lib64/libGLEW.* /app/lib/ || true
+        fi
+      - echo "=== Final GLEW files ==="
+      - ls -la /app/lib/libGLEW* || echo "No GLEW in /app/lib"
+      - ls -la /app/lib64/libGLEW* || echo "No GLEW in /app/lib64"
     sources:
       - type: archive
         url: https://github.com/nigels-com/glew/releases/download/glew-2.2.0/glew-2.2.0.tgz
@@ -103,7 +113,6 @@ modules:
     cleanup:
       - /include
       - /lib/pkgconfig
-      - '*.a'
 
   - name: glm
     buildsystem: simple
