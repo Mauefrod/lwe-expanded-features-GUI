@@ -17,7 +17,6 @@ command: lwe-gui
 
 # Build options to limit resource usage (compilation can be memory-intensive)
 build-options:
-  # Limit parallel jobs to 2 (prevents RAM exhaustion on i7 12700K with 16GB RAM)
   # Adjust if needed: jobs = (RAM_GB / 4) - 1. For 16GB: (16/4)-1 = 3 max, using 2 for safety
   env:
     MAKEFLAGS: "-j2"
