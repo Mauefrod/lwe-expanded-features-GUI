@@ -179,7 +179,9 @@ modules:
         url: https://code.videolan.org/videolan/libplacebo.git
         tag: v7.349.0
         commit: 1fd3c7bde7b943fe8985c893310b5269a09b46c5
-
+    post-install:
+      - install -Dm644 _flatpak_build/meson-private/libplacebo.pc /app/lib/pkgconfig/libplacebo.pc
+      
   - name: mpv
     buildsystem: meson
     config-opts:
