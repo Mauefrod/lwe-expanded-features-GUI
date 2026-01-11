@@ -15,6 +15,9 @@ build-options:
   cflags: "-O1"  # Use -O1 instead of -O2/-O3 to reduce compile time and memory
   ldflags: "-L/app/lib -L/app/lib64"
   append-ld-library-path: /app/lib:/app/lib64
+  # Force all libraries to install to /app/lib consistently
+  prefix: /app
+  libdir: /app/lib
 
 finish-args:
   # X11 socket for window manipulation (CRITICAL for --above flag)
@@ -70,6 +73,7 @@ modules:
     buildsystem: meson
     config-opts:
       - --buildtype=release
+      - --libdir=lib
     sources:
       - type: archive
         url: https://archive.mesa3d.org/glu/glu-9.0.3.tar.xz
@@ -83,6 +87,7 @@ modules:
     config-opts:
       - -DFREEGLUT_BUILD_DEMOS=OFF
       - -DFREEGLUT_BUILD_STATIC_LIBS=OFF
+      - -DCMAKE_INSTALL_LIBDIR=lib
     sources:
       - type: archive
         url: https://downloads.sourceforge.net/project/freeglut/freeglut/3.4.0/freeglut-3.4.0.tar.gz
@@ -94,18 +99,12 @@ modules:
   - name: glew
     buildsystem: simple
     build-commands:
-      - make
-      - make install GLEW_DEST=/app
-      - echo "=== GLEW files installed ==="
-      - find /app -name "libGLEW*"
-      - |
-        if [ -f /app/lib64/libGLEW.so.2.2.0 ]; then
-          mkdir -p /app/lib
-          cp -a /app/lib64/libGLEW.* /app/lib/ || true
-        fi
-      - echo "=== Final GLEW files ==="
-      - ls -la /app/lib/libGLEW* || echo "No GLEW in /app/lib"
-      - ls -la /app/lib64/libGLEW* || echo "No GLEW in /app/lib64"
+      - make GLEW_PREFIX=/app GLEW_DEST=/app LIBDIR=/app/lib
+      - make install GLEW_PREFIX=/app GLEW_DEST=/app LIBDIR=/app/lib
+      - echo "=== GLEW installation check ==="
+      - find /app -name "libGLEW*" -type f -o -name "libGLEW*" -type l
+      - ls -la /app/lib/libGLEW* 2>/dev/null || echo "WARNING: No GLEW in /app/lib"
+      - ls -la /app/lib64/libGLEW* 2>/dev/null || echo "No GLEW in /app/lib64 (this is OK)"
     sources:
       - type: archive
         url: https://github.com/nigels-com/glew/releases/download/glew-2.2.0/glew-2.2.0.tgz
@@ -135,19 +134,19 @@ modules:
       - -DCMAKE_INSTALL_PREFIX=/app
       - -DCMAKE_INSTALL_LIBDIR=lib
     post-install:
-      - echo "=== GLFW files installed ==="
-      - ls -la /app/lib/libglfw* || echo "No libglfw files found in /app/lib"
-      - ls -la /app/lib64/libglfw* || echo "No libglfw files found in /app/lib64"
-      - echo "=== Creating symlinks ==="
-      - |
-        if [ -f /app/lib/libglfw.so.3 ]; then
-          cd /app/lib && ln -sf libglfw.so.3 libglfw.so
-        elif [ -f /app/lib64/libglfw.so.3 ]; then
-          cd /app/lib64 && ln -sf libglfw.so.3 libglfw.so
-          mkdir -p /app/lib && cd /app/lib && ln -sf ../lib64/libglfw.so.3 libglfw.so.3 && ln -sf ../lib64/libglfw.so libglfw.so
-        fi
-      - echo "=== Final GLFW files ==="
+      - echo "=== GLFW installation check ==="
       - find /app -name "libglfw*" -type f -o -name "libglfw*" -type l
+      - ls -la /app/lib/libglfw* 2>/dev/null || echo "WARNING: No GLFW in /app/lib"
+      - |
+        if [ ! -f /app/lib/libglfw.so ]; then
+          if [ -f /app/lib/libglfw.so.3 ]; then
+            cd /app/lib && ln -sf libglfw.so.3 libglfw.so
+          elif [ -f /app/lib64/libglfw.so.3 ]; then
+            mkdir -p /app/lib
+            cd /app/lib && ln -sf ../lib64/libglfw.so.3 libglfw.so.3
+            ln -sf libglfw.so.3 libglfw.so
+          fi
+        fi
     sources:
       - type: archive
         url: https://github.com/glfw/glfw/archive/refs/tags/3.4.tar.gz
@@ -173,6 +172,8 @@ modules:
 
   - name: fribidi
     buildsystem: meson
+    config-opts:
+      - --libdir=lib
     sources:
       - type: archive
         url: https://github.com/fribidi/fribidi/releases/download/v1.0.16/fribidi-1.0.16.tar.xz
@@ -184,6 +185,8 @@ modules:
 
   - name: libass
     buildsystem: autotools
+    config-opts:
+      - --libdir=/app/lib
     sources:
       - type: archive
         url: https://github.com/libass/libass/releases/download/0.17.3/libass-0.17.3.tar.gz
@@ -215,6 +218,7 @@ modules:
       - -Djavascript=disabled
       - -Dalsa=disabled
       - -Dvapoursynth=disabled
+      - --libdir=lib
     sources:
       - type: archive
         url: https://github.com/mpv-player/mpv/archive/refs/tags/v0.39.0.tar.gz
@@ -230,6 +234,7 @@ modules:
     config-opts:
       - --enable-shared
       - --enable-threads
+      - --libdir=/app/lib
     sources:
       - type: archive
         url: http://www.fftw.org/fftw-3.3.10.tar.gz
@@ -257,10 +262,20 @@ modules:
       - -DCEF_ROOT=/app/cef
       - -DCMAKE_INSTALL_PREFIX=/app
       - -DCMAKE_PREFIX_PATH=/app
+      - -DCMAKE_INSTALL_LIBDIR=lib
       - -DCMAKE_LIBRARY_PATH=/app/lib:/app/lib64
+      - -DGLEW_INCLUDE_DIR=/app/include
+      - -DGLEW_LIBRARY=/app/lib/libGLEW.so
+    build-commands:
+      - echo "=== Pre-build library check ==="
+      - ls -la /app/lib/libGLEW* || echo "WARNING: GLEW not found!"
+      - ls -la /app/lib/libglfw* || echo "WARNING: GLFW not found!"
+      - pkg-config --libs glew glfw3 || echo "pkg-config check failed (may be OK)"
     post-install:
       - cp -v output/linux-wallpaperengine /app/bin/ || cp -v linux-wallpaperengine /app/bin/ || find . -name "linux-wallpaperengine" -type f -exec cp -v {} /app/bin/ \;
       - chmod +x /app/bin/linux-wallpaperengine
+      - echo "=== Verifying binary dependencies ==="
+      - ldd /app/bin/linux-wallpaperengine || echo "ldd check failed"
     sources:
       - type: git
         url: https://github.com/Almamu/linux-wallpaperengine.git
@@ -279,6 +294,8 @@ modules:
 
   - name: libxmu
     buildsystem: autotools
+    config-opts:
+      - --libdir=/app/lib
     sources:
       - type: archive
         url: https://www.x.org/releases/individual/lib/libXmu-1.1.4.tar.xz
