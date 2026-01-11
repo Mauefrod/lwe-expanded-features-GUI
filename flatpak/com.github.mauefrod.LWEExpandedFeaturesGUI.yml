@@ -155,7 +155,7 @@ modules:
       - /include
       - /lib/pkgconfig
 
-   - name: libplacebo
+  - name: libplacebo
     buildsystem: meson
     config-opts:
       - -Dvulkan=disabled
@@ -167,8 +167,7 @@ modules:
       - type: git
         url: https://code.videolan.org/videolan/libplacebo.git
         tag: v6.338.2
-
-
+        
   - name: mpv
     buildsystem: meson
     config-opts:
