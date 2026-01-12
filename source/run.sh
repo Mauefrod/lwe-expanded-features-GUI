@@ -51,7 +51,7 @@ detect_backend() {
         "/usr/local/bin/linux-wallpaperengine"
         "/usr/bin/linux-wallpaperengine"
         "$HOME/linux-wallpaperengine/build/output/linux-wallpaperengine"
-        "$ROOT_DIR/linux-wallpaperengine/build/linux-wallpaperengine"
+        "$ROOT_DIR/linux-wallpaperengine/build/output/linux-wallpaperengine"  # Local installation (official build structure)
     )
     
     for location in "${locations[@]}"; do
@@ -80,12 +80,13 @@ if ! detect_backend; then
     echo "  - /usr/local/bin/"
     echo "  - /usr/bin/"
     echo "  - $HOME/linux-wallpaperengine/build/output/"
-    echo "  - $ROOT_DIR/linux-wallpaperengine/build/"
+    echo "  - $ROOT_DIR/linux-wallpaperengine/build/output/"
     echo ""
     echo -e "${YELLOW}[i]${NC} Install options:"
-    echo "  1. Copy to ~/.local/bin: cp ~/linux-wallpaperengine/build/output/linux-wallpaperengine ~/.local/bin/"
-    echo "  2. Add to PATH: export PATH=\"\$HOME/linux-wallpaperengine/build/output:\$PATH\""
-    echo "  3. Install from source: https://github.com/Acters/linux-wallpaperengine"
+    echo "  1. Run the installer to build locally: ./install.sh"
+    echo "  2. Copy to ~/.local/bin: cp ~/linux-wallpaperengine/build/output/linux-wallpaperengine ~/.local/bin/"
+    echo "  3. Add to PATH: export PATH=\"\$HOME/linux-wallpaperengine/build/output:\$PATH\""
+    echo "  4. Install from source: https://github.com/Almamu/linux-wallpaperengine"
     echo ""
     echo -e "${RED}[✗]${NC} Cannot continue without backend. Exiting."
     exit 1
