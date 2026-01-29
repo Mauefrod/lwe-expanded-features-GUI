@@ -1,0 +1,11 @@
+[Unit]
+Description=Linux Wallpaper Engine
+After=graphical.target
+
+[Service]
+Type=oneshot
+ExecStart=%SCRIPT_PATH%
+RemainAfterExit=yes
+
+[Install]
+WantedBy=default.target

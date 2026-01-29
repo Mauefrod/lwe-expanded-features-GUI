@@ -24,6 +24,7 @@ RESOLUTIONS = [
 ]
 
 DEFAULT_CONFIG = {
+    "__run_at_startup__": False,
     "--window": {
         "active": False,
         "res": "0x0x0x0"
