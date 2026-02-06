@@ -328,7 +328,7 @@ class EventHandlers:
         """Detiene el engine"""
         self.log("[GUI] Stopping engine and loops")
         
-        # Import path_utils for Flatpak-aware path resolution
+        # Import path_utils for path resolution
         from gui.path_utils import get_script_path
         
         try:

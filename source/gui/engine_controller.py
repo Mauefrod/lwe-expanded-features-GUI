@@ -14,7 +14,7 @@ class EngineController:
         self.log_callback = log_callback
         self.script_path = None
         
-        # Obtener ruta del script main.sh (Flatpak-aware)
+        # Get path to main.sh script
         try:
             self.script_path = get_script_path("main.sh")
             # Log only if callback is available

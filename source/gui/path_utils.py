@@ -1,18 +1,16 @@
 """
-Utility functions for path resolution in different environments
-Handles both native and Flatpak installations
+Utility functions for path resolution
 """
 import os
 
 
 def get_script_path(script_name):
     """
-    Get path to backend script, Flatpak-aware
+    Get path to backend script
     
     Tries multiple locations:
     1. LWE_SCRIPT_DIR environment variable
-    2. Relative to GUI module (native installation)
-    3. /app/share/lwe-gui (Flatpak installation)
+    2. Relative to GUI module
     
     Args:
         script_name: Name of script (e.g., "main.sh")
@@ -30,7 +28,7 @@ def get_script_path(script_name):
         if os.path.exists(script_path):
             return script_path
     
-    # Try relative to this module (native installation)
+    # Try relative to this module
     # Path structure: /source/gui/path_utils.py
     # We need to go UP one level to /source, then access core/main.sh
     module_dir = os.path.dirname(os.path.abspath(__file__))
@@ -40,16 +38,10 @@ def get_script_path(script_name):
     if os.path.exists(script_path):
         return script_path
     
-    # Try /app/share/lwe-gui (Flatpak installation)
-    flatpak_path = os.path.join("/app/share/lwe-gui/source/core", script_name)
-    if os.path.exists(flatpak_path):
-        return flatpak_path
-    
     # Provide helpful error message
     attempted_paths = [
         os.getenv('LWE_SCRIPT_DIR', '<not set>'),
-        script_path,
-        flatpak_path
+        script_path
     ]
     raise FileNotFoundError(
         f"Script '{script_name}' not found in any expected location.\n"

@@ -1,7 +1,7 @@
 #!/bin/bash
 # lwe-state-manager.sh
-# Helper script to manage engine state for Flatpak compatibility
-# This allows better process tracking even when wmctrl/xdotool are unavailable
+# Helper script to manage engine state for process tracking
+# Allows better process tracking through state files
 
 set -euo pipefail
 
@@ -21,8 +21,7 @@ init_state() {
   "last_pid": null,
   "last_windows": [],
   "last_wallpaper": null,
-  "last_execution": null,
-  "in_flatpak": $([ -f /.flatpak-info ] && echo "true" || echo "false")
+  "last_execution": null
 }
 EOF
         echo "Initialized state file: $ENGINE_STATE"
@@ -54,8 +53,7 @@ save_state() {
   "last_pid": $pid,
   "last_windows": [$(printf '"%s"' "${windows:-}")],
   "last_wallpaper": "$escaped_wallpaper",
-  "last_execution": "$timestamp",
-  "in_flatpak": $([ -f /.flatpak-info ] && echo "true" || echo "false")
+  "last_execution": "$timestamp"
 }
 EOF
     
@@ -202,7 +200,7 @@ case "${1:-help}" in
         ;;
     help|*)
         cat <<EOF
-LWE State Manager - Manage linux-wallpaperengine state for Flatpak
+LWE State Manager - Manage linux-wallpaperengine state
 
 Usage: $0 COMMAND [ARGS]
 
