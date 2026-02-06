@@ -1,26 +1,18 @@
 #!/bin/bash
 # window-monitor.sh
-# Background daemon to monitor and manipulate LWE windows
-# ENHANCED FOR FLATPAK: Uses multiple strategies to detect and manipulate windows
-# Includes X11 sync, XDotool fallbacks, and process-based detection
+# Background daemon to monitor and manipulate wallpaper engine windows
+# Uses multiple strategies to detect and manipulate windows
 #
-# Usage: window-monitor.sh <pid> <remove_above> [log_file] [app_id]
+# Usage: window-monitor.sh <pid> <remove_above> [log_file]
 
 set -euo pipefail
 
 ENGINE_PID="${1:-}"
 REMOVE_ABOVE="${2:-false}"
 LOG_FILE="${3:-}"
-FLATPAK_APP_ID="${4:-}"
 
 if [[ -z "$ENGINE_PID" ]]; then
     exit 1
-fi
-
-# Detect if running in Flatpak
-IN_FLATPAK=false
-if [[ -f /.flatpak-info ]]; then
-    IN_FLATPAK=true
 fi
 
 # Non-blocking logging
@@ -122,7 +114,7 @@ apply_window_flags() {
     return 1
 }
 
-log_monitor "Starting enhanced window monitor for PID $ENGINE_PID (Flatpak: $IN_FLATPAK)"
+log_monitor "Starting window monitor for PID $ENGINE_PID"
 
 attempt=0
 max_attempts=600  # 5 minutes at 0.5 second intervals

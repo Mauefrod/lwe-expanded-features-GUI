@@ -17,6 +17,7 @@ SKIP_SYSTEM_DEPS=false
 NON_INTERACTIVE=false
 DRY_RUN=false
 INSTALL_BACKEND=false
+AUDIO_SYSTEM=""  # Will be auto-detected or user-selected
 
 # Helper functions
 print_header() {
@@ -122,10 +123,74 @@ detect_package_manager() {
     fi
 }
 
+# Detect available audio systems
+detect_audio_systems() {
+    local available_audio=()
+    
+    # Check for PipeWire
+    if command -v pipewire >/dev/null 2>&1 || command -v pactl >/dev/null 2>&1; then
+        # pactl can be used by both PulseAudio and PipeWire
+        # Check if PipeWire is actually running or configured
+        if command -v pw-cli >/dev/null 2>&1; then
+            available_audio+=("pipewire")
+        fi
+    fi
+    
+    # Check for PulseAudio
+    if command -v pulseaudio >/dev/null 2>&1 || (command -v pactl >/dev/null 2>&1 && ! command -v pw-cli >/dev/null 2>&1); then
+        available_audio+=("pulseaudio")
+    fi
+    
+    # If nothing detected but pactl is available, default to PulseAudio compatibility
+    if [[ ${#available_audio[@]} -eq 0 ]] && command -v pactl >/dev/null 2>&1; then
+        available_audio+=("pulseaudio")
+    fi
+    
+    # Output as space-separated list
+    printf '%s ' "${available_audio[@]}"
+}
+
+# Get audio dependencies for a specific system
+get_audio_packages() {
+    local manager="$1"
+    local audio_system="$2"  # "pulseaudio" or "pipewire"
+    
+    case "$manager:$audio_system" in
+        apt:pulseaudio)
+            echo "libpulse-dev libpulse0"
+            ;;
+        apt:pipewire)
+            echo "libpipewire-0.3-dev pipewire pipewire-pulse"
+            ;;
+        pacman:pulseaudio)
+            echo "pulseaudio"
+            ;;
+        pacman:pipewire)
+            echo "pipewire pipewire-pulse"
+            ;;
+        dnf:pulseaudio)
+            echo "pulseaudio-libs-devel"
+            ;;
+        dnf:pipewire)
+            echo "pipewire pipewire-pulseaudio pipewire-devel"
+            ;;
+        zypper:pulseaudio)
+            echo "libpulse-devel"
+            ;;
+        zypper:pipewire)
+            echo "pipewire pipewire-pulseaudio-modules pipewire-devel"
+            ;;
+        *)
+            echo ""
+            ;;
+    esac
+}
+
 # Get package list for a specific manager
 get_packages() {
     local manager="$1"
     local package_type="$2"  # "gui" or "backend"
+    local audio_system="${3:-pulseaudio}"  # optional audio system parameter
     
     case "$manager" in
         apt)
@@ -134,15 +199,19 @@ get_packages() {
             else
                 # Official linux-wallpaperengine dependencies for Ubuntu/Debian
                 # Works for both 22.04 and 24.04 (libmpv1 vs libmpv2 handled by apt)
-                echo "build-essential cmake libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libgl-dev libglew-dev freeglut3-dev libsdl2-dev liblz4-dev libavcodec-dev libavformat-dev libavutil-dev libswscale-dev libxxf86vm-dev libglm-dev libglfw3-dev libmpv-dev mpv libpulse-dev libpulse0 libfftw3-dev git"
+                local audio_deps
+                audio_deps=$(get_audio_packages "$manager" "$audio_system")
+                echo "build-essential cmake libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libgl-dev libglew-dev freeglut3-dev libsdl2-dev liblz4-dev libavcodec-dev libavformat-dev libavutil-dev libswscale-dev libxxf86vm-dev libglm-dev libglfw3-dev libmpv-dev mpv $audio_deps libfftw3-dev git"
             fi
             ;;
         pacman)
             if [[ "$package_type" == "gui" ]]; then
                 echo "wmctrl xdotool tk python-pillow python-virtualenv"
             else
-                # Arch Linux dependencies (common names)
-                echo "base-devel cmake libxrandr libxinerama libxcursor libxi mesa glew freeglut sdl2 lz4 ffmpeg libxxf86vm glm glfw-x11 mpv pulseaudio fftw git"
+                # Arch Linux dependencies
+                local audio_deps
+                audio_deps=$(get_audio_packages "$manager" "$audio_system")
+                echo "base-devel cmake libxrandr libxinerama libxcursor libxi mesa glew freeglut sdl2 lz4 ffmpeg libxxf86vm glm glfw-x11 mpv $audio_deps fftw git"
             fi
             ;;
         dnf)
@@ -150,15 +219,19 @@ get_packages() {
                 echo "wmctrl xdotool python3-tkinter python3-pillow python3-virtualenv"
             else
                 # Official linux-wallpaperengine dependencies for Fedora
-                echo "gcc gcc-c++ cmake libXrandr-devel libXinerama-devel libXcursor-devel libXi-devel mesa-libGL-devel glew-devel freeglut-devel SDL2-devel lz4-devel ffmpeg ffmpeg-free-devel libXxf86vm-devel glm-devel glfw-devel mpv mpv-devel pulseaudio-libs-devel fftw-devel git"
+                local audio_deps
+                audio_deps=$(get_audio_packages "$manager" "$audio_system")
+                echo "gcc gcc-c++ cmake libXrandr-devel libXinerama-devel libXcursor-devel libXi-devel mesa-libGL-devel glew-devel freeglut-devel SDL2-devel lz4-devel ffmpeg ffmpeg-free-devel libXxf86vm-devel glm-devel glfw-devel mpv mpv-devel $audio_deps fftw-devel git"
             fi
             ;;
         zypper)
             if [[ "$package_type" == "gui" ]]; then
                 echo "wmctrl xdotool python3-tk python3-pillow python3-virtualenv"
             else
-                # openSUSE dependencies (common package names)
-                echo "gcc gcc-c++ cmake libXrandr-devel libXinerama-devel libXcursor-devel libXi-devel Mesa-libGL-devel glew-devel freeglut-devel libSDL2-devel liblz4-devel ffmpeg-4-libavcodec-devel ffmpeg-4-libavformat-devel ffmpeg-4-libavutil-devel ffmpeg-4-libswscale-devel libXxf86vm-devel glm-devel glfw-devel mpv libmpv-devel libpulse-devel fftw3-devel git"
+                # openSUSE dependencies
+                local audio_deps
+                audio_deps=$(get_audio_packages "$manager" "$audio_system")
+                echo "gcc gcc-c++ cmake libXrandr-devel libXinerama-devel libXcursor-devel libXi-devel Mesa-libGL-devel glew-devel freeglut-devel libSDL2-devel liblz4-devel ffmpeg-4-libavcodec-devel ffmpeg-4-libavformat-devel ffmpeg-4-libavutil-devel ffmpeg-4-libswscale-devel libXxf86vm-devel glm-devel glfw-devel mpv libmpv-devel $audio_deps fftw3-devel git"
             fi
             ;;
         *)
@@ -195,6 +268,66 @@ get_install_command() {
 PKG_MANAGER=$(detect_package_manager)
 print_info "Detected package manager: $PKG_MANAGER"
 
+# Audio system detection and selection
+print_header "Audio system configuration"
+AVAILABLE_AUDIO=$(detect_audio_systems)
+
+if [[ -z "$AVAILABLE_AUDIO" ]]; then
+    print_info "No audio system detected on your system"
+    print_info "https://github.com/Acters/linux-wallpaperengine supports both PipeWire and PulseAudio"
+    print_info "Defaulting to PulseAudio for development dependencies"
+    AUDIO_SYSTEM="pulseaudio"
+else
+    # Parse available systems
+    read -ra AUDIO_OPTIONS <<< "$AVAILABLE_AUDIO"
+    
+    if [[ ${#AUDIO_OPTIONS[@]} -eq 1 ]]; then
+        AUDIO_SYSTEM="${AUDIO_OPTIONS[0]}"
+        print_success "Detected audio system: $AUDIO_SYSTEM"
+    else
+        print_info "Multiple audio systems detected: ${AUDIO_OPTIONS[*]}"
+        
+        if [[ "$NON_INTERACTIVE" == true ]]; then
+            # In non-interactive mode, prefer PipeWire if available
+            if [[ "$AVAILABLE_AUDIO" == *"pipewire"* ]]; then
+                AUDIO_SYSTEM="pipewire"
+            else
+                AUDIO_SYSTEM="pulseaudio"
+            fi
+            print_info "Selected audio system: $AUDIO_SYSTEM (non-interactive mode)"
+        else
+            # Interactive mode: ask user to choose audio system
+            echo ""
+            echo "Which audio system would you like to build against?"
+            echo ""
+            for i in "${!AUDIO_OPTIONS[@]}"; do
+                echo "  $((i + 1))) ${AUDIO_OPTIONS[$i]}"
+            done
+            echo ""
+            
+            if [[ -t 0 ]]; then
+                # stdin is a terminal - safe to use read
+                while true; do
+                    read -p "Enter choice (1-${#AUDIO_OPTIONS[@]}): " choice
+                    if [[ "$choice" =~ ^[0-9]+$ ]] && (( choice >= 1 && choice <= ${#AUDIO_OPTIONS[@]} )); then
+                        AUDIO_SYSTEM="${AUDIO_OPTIONS[$((choice - 1))}}"
+                        print_success "Selected audio system: $AUDIO_SYSTEM"
+                        break
+                    else
+                        print_error "Invalid selection. Please enter a number between 1 and ${#AUDIO_OPTIONS[@]}"
+                    fi
+                done
+            else
+                # stdin is not a terminal (e.g., piped) - use first available
+                AUDIO_SYSTEM="${AUDIO_OPTIONS[0]}"
+                print_success "Selected audio system: $AUDIO_SYSTEM (auto-selected due to piped input)"
+            fi
+    fi
+fi
+fi
+
+print_info "Building with $AUDIO_SYSTEM audio support"
+
 # System dependencies installation
 if [[ "$SKIP_SYSTEM_DEPS" == false ]]; then
     print_header "Installing system dependencies"
@@ -227,7 +360,7 @@ if [[ "$SKIP_SYSTEM_DEPS" == false ]]; then
         fi
     else
         GUI_DEPS=$(get_packages "$PKG_MANAGER" "gui")
-        BACKEND_DEPS=$(get_packages "$PKG_MANAGER" "backend")
+        BACKEND_DEPS=$(get_packages "$PKG_MANAGER" "backend" "$AUDIO_SYSTEM")
         ALL_DEPS="$GUI_DEPS $BACKEND_DEPS"
         PKG_INSTALL_CMD=$(get_install_command "$PKG_MANAGER" "$ALL_DEPS")
         
@@ -293,37 +426,6 @@ for script in "source/core/main.sh" "source/core/lwe-state-manager.sh" "source/r
         print_success "Set executable bit on $script"
     fi
 done
-
-# Install helper scripts to system paths (optional, with sudo if needed)
-print_header "Installing helper scripts (optional)"
-if [[ -f "flatpak/lwe-window-manager.sh" ]]; then
-    INSTALL_DIR="/usr/local/bin"
-    if [[ -w "$INSTALL_DIR" ]]; then
-        run_or_echo "cp flatpak/lwe-window-manager.sh $INSTALL_DIR/"
-        run_or_echo "chmod +x $INSTALL_DIR/lwe-window-manager.sh"
-        print_success "Installed lwe-window-manager.sh to $INSTALL_DIR/"
-    else
-        if command -v sudo >/dev/null 2>&1; then
-            if [[ "$NON_INTERACTIVE" == false ]]; then
-                echo ""
-                read -p "lwe-window-manager.sh needs sudo to install to $INSTALL_DIR. Continue? [Y/n] " ans_install
-                ans_install=${ans_install:-Y}
-            else
-                ans_install=Y
-            fi
-            if [[ "$ans_install" =~ ^[Yy] ]]; then
-                if [[ "$DRY_RUN" == true ]]; then
-                    echo "[DRY-RUN] sudo cp flatpak/lwe-window-manager.sh $INSTALL_DIR/"
-                    echo "[DRY-RUN] sudo chmod +x $INSTALL_DIR/lwe-window-manager.sh"
-                else
-                    sudo cp flatpak/lwe-window-manager.sh "$INSTALL_DIR/" && \
-                    sudo chmod +x "$INSTALL_DIR/lwe-window-manager.sh" && \
-                    print_success "Installed lwe-window-manager.sh to $INSTALL_DIR/"
-                fi
-            fi
-        fi
-    fi
-fi
 
 # Create standard directories
 print_header "Creating application directories"

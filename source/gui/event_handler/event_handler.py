@@ -328,7 +328,7 @@ class EventHandlers:
         """Detiene el engine"""
         self.log("[GUI] Stopping engine and loops")
         
-        # Import path_utils for Flatpak-aware path resolution
+        # Import path_utils for path resolution
         from gui.path_utils import get_script_path
         
         try:
@@ -357,3 +357,21 @@ class EventHandlers:
         except Exception as e:
             self.log(f"[ERROR] Failed to stop engine: {str(e)}")
             messagebox.showerror("Error", f"Failed to stop engine: {str(e)}")
+    
+    # ========== Keybindings ==========
+    
+    def on_configure_keybindings(self):
+        """Opens the keybinding configuration dialog"""
+        try:
+            from gui.keybinding_dialog import KeybindingEditorDialog
+            
+            self.log("[HANDLER] Opening keybinding editor")
+            dialog = KeybindingEditorDialog(
+                self.ui['main_window'],
+                self.ui.get('keybinding_controller'),
+                self.log
+            )
+            dialog.show()
+        except Exception as e:
+            self.log(f"[ERROR] Failed to open keybinding editor: {str(e)}")
+            messagebox.showerror("Error", f"Failed to open keybinding editor: {str(e)}")

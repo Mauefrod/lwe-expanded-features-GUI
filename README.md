@@ -176,40 +176,6 @@ Ensure `linux-wallpaperengine` is installed and in your PATH.
 
 ---
 
-## 🧪 Flatpak Integration (experimental)
-
-<details>
-
-This repository includes a Flatpak build description under the `flatpak/` directory to produce a sandboxed application bundle. The Flatpak build can be useful for testing or distributing a packaged desktop app, but it has important limitations (see notes below).
-
-### Build & Install (example)
-
-Build and install locally with `flatpak-builder` (developer machine):
-
-```bash
-# build and install for the current user
-flatpak-builder --user --install --force-clean build-dir com.github.mauefrod.LWEExpandedFeaturesGUI.yml
-
-# run the installed Flatpak
-flatpak run com.github.mauefrod.LWEExpandedFeaturesGUI
-```
-
-Notes:
-- The exact manifest path may vary; adjust the `.yml` filename for your architecture or manifest location in `flatpak/`.
-- Flatpak builds are sandboxed and therefore may require extra permissions if you need filesystem or DBus access outside the sandbox.
-
-### Important limitations — Flatpak is NOT RECOMMENDED for full functionality
-
-Because Flatpak runs the application inside a sandbox, it severely limits the application's ability to detect existing windows and interact with external processes. As a result, features that depend on observing or controlling the external `linux-wallpaperengine` process (for example, the `--delay`, `--random`, `--above` flags, and reliable window detection/management) will not work correctly or reliably in the Flatpak build.
-
-Therefore, using the Flatpak build is considered experimental. For reliable behavior and full feature support (especially automatic/random/delay modes and always-on-top/window-management flags), we strongly recommend installing and running the native build using the provided `install.sh` installer (see Installation above).
-
-If you still wish to try the Flatpak build, treat it as best-effort and test carefully for your desktop environment and display server.
-
-</details>
-
----
-
 ## 📖 Usage
 
 <details>
@@ -280,12 +246,11 @@ linux-wallpaper-engine-features/
 │   │   ├── wallpaper_loader.py# Thumbnail & preview loading + caching
 │   │   ├── engine_controller.py# Starts/stops backend engine and manages flags
 │   │   ├── event_handler/     # User event processing
-   │   ├── gallery_view/      # Gallery management and rendering
+│   │   ├── gallery_view/      # Gallery management and rendering
 │   │   └── ui_components/     # Reusable UI widgets (buttons, panels)
 │   └── core/
 │       └── main.sh            # Helper shell scripts used by the backend
 ├── install.sh                  # Native installer (recommended)
-├── flatpak/                    # Flatpak manifests and build-dir (packaging)
 ├── requirements.txt            # Python dependencies
 └── README.md                   # This file
 ```
@@ -311,7 +276,6 @@ linux-wallpaper-engine-features/
 ### Packaging notes
 
 - **Native build (recommended)**: `install.sh` sets up a native environment where the application has full access to system tools and processes. This results in reliable detection of existing wallpaper windows and correct behavior for `--delay`, `--random`, `--above`, and other window-management features.
-- **Flatpak (experimental)**: The Flatpak build is provided for convenience/packaging in `flatpak/` but is sandboxed; sandboxing restricts filesystem, process, and window visibility which breaks or limits features that rely on interacting with external processes or the X11 window stack. For full functionality, prefer the native install.
 
 ---
 

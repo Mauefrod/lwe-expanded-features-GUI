@@ -68,7 +68,6 @@ requirements.lock.txt
 INSTALL_NOTES.md
 /config.json
 source/core/config.json
-flatpak/*.tar.bz2
 
 # Documentation and changelog files (generated, not tracked)
 # Ignore all .md files except README.md
