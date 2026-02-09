@@ -1,11 +1,34 @@
 [Unit]
 Description=Linux Wallpaper Engine
-After=graphical.target
+Documentation=https://github.com/mauefrod/lwe-expanded-features-GUI
+After=graphical-session-pre.target
+Wants=graphical-session-pre.target
+PartOf=graphical-session.target
 
 [Service]
 Type=oneshot
 ExecStart=%SCRIPT_PATH%
 RemainAfterExit=yes
 
+# Service configuration for reliability
+StandardOutput=journal
+StandardError=journal
+SyslogLevel=info
+
+# Timeout settings
+TimeoutStartSec=60
+TimeoutStopSec=30
+
+# Resource limits
+LimitNOFILE=65536
+
+# Environmental setup
+PassEnvironment=DISPLAY XAUTHORITY XDG_SEAT XDG_SEAT_PATH XDG_VTNR
+UnsetEnvironment=SESSION_MANAGER QT_LOGGING_RULES
+
+# Restart policy: if the wallpaper engine setup fails, don't auto-restart
+# (this is oneshot, so failures are permanent unless manually triggered)
+Restart=no
+
 [Install]
-WantedBy=default.target
+WantedBy=graphical-session.target

@@ -1,9 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
-# Support both Flatpak and native installations
-DATA_DIR="${LWE_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/linux-wallpaper-engine-features}"
-CONFIG_DIR="${LWE_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/linux-wallpaper-engine-features}"
+DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/linux-wallpaper-engine-features"
+CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/linux-wallpaper-engine-features"
 
 LOG_FILE="$DATA_DIR/logs.txt"
 PID_FILE="$DATA_DIR/loop.pid"
@@ -12,26 +11,6 @@ PREV_WINDOWS_FILE="$DATA_DIR/prev_windows.txt"
 
 # Ensure directories exist
 mkdir -p "$DATA_DIR" "$CONFIG_DIR"
-
-# Detectar si estamos en Flatpak
-if [ -f /.flatpak-info ]; then
-    IN_FLATPAK=true
-    # Get Flatpak app ID from environment or metadata
-    FLATPAK_APP_ID="${FLATPAK_ID:-com.github.mauefrod.LWEExpandedFeaturesGUI}"
-    # Inside Flatpak, wmctrl and xdotool are available locally (bundled in the Flatpak)
-    # They can access the host's X11 through the X11 socket forwarding
-    # NO need for flatpak-spawn --host; use local tools instead
-    wmctrl() { command wmctrl "$@"; }
-    xdotool() { command xdotool "$@"; }
-    # Window manager script for robust window operations
-    WINDOW_MANAGER="/app/bin/lwe-window-manager.sh"
-    run_window_manager() { "$WINDOW_MANAGER" "$@"; }
-else
-    IN_FLATPAK=false
-    FLATPAK_APP_ID=""
-    WINDOW_MANAGER="/usr/local/bin/lwe-window-manager.sh"
-    run_window_manager() { "$WINDOW_MANAGER" "$@"; }
-fi
 
 # Diagnostic function to test if wmctrl works
 test_wmctrl() {
@@ -45,23 +24,6 @@ test_wmctrl() {
             log "DEBUG: wmctrl error output: $wmctrl_error"
         else
             log "DEBUG: wmctrl returned empty output (no windows or permission denied)"
-        fi
-        
-        # Check if flatpak-spawn is available
-        if [[ "$IN_FLATPAK" == "true" ]]; then
-            if command -v flatpak-spawn >/dev/null 2>&1; then
-                log "DEBUG: flatpak-spawn is available in PATH"
-                # Try calling it directly to see if it works
-                local spawn_test
-                spawn_test=$(flatpak-spawn --host echo "OK" 2>&1 || true)
-                if [[ "$spawn_test" == "OK" ]]; then
-                    log "DEBUG: flatpak-spawn --host is working"
-                else
-                    log "DEBUG: flatpak-spawn --host test failed: $spawn_test"
-                fi
-            else
-                log "DEBUG: flatpak-spawn NOT found in PATH"
-            fi
         fi
         return 1
     fi
@@ -83,7 +45,6 @@ log() {
 }
 
 log "==================== NEW EXECUTION ===================="
-log "Running in Flatpak: $IN_FLATPAK"
 
 ###############################################
 #  ENGINE DETECTION (ROBUST)
@@ -134,28 +95,6 @@ detect_engine() {
         fi
     done
     
-    # Strategy 3: In Flatpak, try to use host's engine via flatpak-spawn
-    if [[ "$IN_FLATPAK" == "true" ]]; then
-        log "Flatpak environment detected, trying host system engine"
-        
-        if command -v flatpak-spawn >/dev/null 2>&1; then
-            # Test if engine is available on host
-            if flatpak-spawn --host which linux-wallpaperengine >/dev/null 2>&1; then
-                ENGINE="flatpak-spawn --host linux-wallpaperengine"
-                log "Engine found on host system (via flatpak-spawn)"
-                return 0
-            elif flatpak-spawn --host which wallpaperengine >/dev/null 2>&1; then
-                ENGINE="flatpak-spawn --host wallpaperengine"
-                log "Engine found on host system as 'wallpaperengine' (via flatpak-spawn)"
-                return 0
-            else
-                log "Engine not found on host system"
-            fi
-        else
-            log "flatpak-spawn not available, cannot access host system"
-        fi
-    fi
-    
     # Engine not found anywhere
     log "ERROR: linux-wallpaperengine binary not found"
     log "Searched locations:"
@@ -164,9 +103,6 @@ detect_engine() {
     log "  - /usr/local/bin/linux-wallpaperengine"
     log "  - /usr/bin/linux-wallpaperengine"
     log "  - ./linux-wallpaperengine/build/linux-wallpaperengine"
-    if [[ "$IN_FLATPAK" == "true" ]]; then
-        log "  - Host system (via flatpak-spawn)"
-    fi
     
     return 1
 }
@@ -189,17 +125,12 @@ fi
 log "Using engine: $ENGINE"
 
 ###############################################
-#  FLATPAK WINDOW DETECTION HELPER
-#  When running in Flatpak, wmctrl has limitations.
-#  This function uses multiple strategies to find windows:
-#  1. Try wmctrl directly (may fail in Flatpak sandbox)
-#  2. Fall back to process PID tracking
-#  3. Use state file as last resort
+#  GET ENGINE WINDOWS
 ###############################################
 get_engine_windows() {
     local -a windows=()
     
-    # Strategy 1: Try wmctrl (works better on native, may fail in Flatpak)
+    # Try wmctrl
     if wmctrl -lx 2>/dev/null | grep -i "linux-wallpaperengine\|wallpaperengine\|steam_app_431960" &>/dev/null; then
         mapfile -t windows < <(wmctrl -lx 2>/dev/null | grep -i "linux-wallpaperengine\|wallpaperengine\|steam_app_431960" | awk '{print $1}' || true)
         if [[ ${#windows[@]} -gt 0 ]]; then
@@ -244,7 +175,7 @@ kill_previous_engine() {
     # Kill by process name (most reliable)
     pkill -f linux-wallpaperengine 2>/dev/null || true
     
-    # Try to close windows if we can detect them (native + Flatpak with --host)
+    # Try to close windows if we can detect them
     local -a old_windows
     mapfile -t old_windows < <(get_engine_windows)
     
@@ -275,12 +206,7 @@ cmd_stop() {
         for win in "${engine_windows[@]}"; do
             if [[ -n "$win" ]] && [[ "$win" != "none" ]]; then
                 log "Attempting to close window: $win"
-                if run_window_manager "close-window" "$win" &>/dev/null; then
-                    log "Successfully closed window $win"
-                else
-                    # Fallback to direct wmctrl
-                    wmctrl -i -c "$win" 2>/dev/null || true
-                fi
+                wmctrl -i -c "$win" 2>/dev/null || true
             fi
         done
     else
@@ -330,46 +256,19 @@ cmd_stop() {
 
 
 ###############################################
-#  Esperar ventana del engine (excluyendo antiguas)
+#  WAIT FOR WINDOW
 # wait_for_window waits for a new engine-related window that is not in the provided exclusion list and echoes its window ID.
 # It accepts zero or more window IDs to ignore (exclude_windows). Searches wmctrl for windows matching
 # "linux-wallpaperengine", "wallpaperengine", or "steam_app_431960" and returns the first ID not in the exclusions.
-# If no new window is found within ~10 seconds, logs an error and echoes an empty string.
-# 
-# FLATPAK NOTE: If wmctrl fails completely (in strict sandboxes), this falls back to waiting by process existence
-# and assumes the window was created successfully after a delay.
 wait_for_window() {
     local -a exclude_windows=("$@")
     local win=""
-    local wmctrl_works=true
-    
-    # Quick test: does wmctrl work?
-    if ! test_wmctrl; then
-        log "WARNING: wmctrl not working (possible Flatpak sandbox restriction)"
-        log "DEBUG: Flatpak mode: $IN_FLATPAK | flatpak-spawn available: $(command -v flatpak-spawn >/dev/null 2>&1 && echo yes || echo no)"
-        wmctrl_works=false
-    else
-        log "DEBUG: wmctrl is working correctly"
-    fi
     
     for i in {1..200}; do
         local -a current_windows=()
+        mapfile -t current_windows < <(wmctrl -lx 2>/dev/null | grep -i "linux-wallpaperengine\|wallpaperengine\|steam_app_431960" | awk '{print $1}' || true)
         
-        if [[ "$wmctrl_works" == "true" ]]; then
-            mapfile -t current_windows < <(wmctrl -lx 2>/dev/null | grep -i "linux-wallpaperengine\|wallpaperengine\|steam_app_431960" | awk '{print $1}' || true)
-        else
-            # Fallback: if wmctrl doesn't work, just wait a bit and assume window is ready
-            # This is a workaround for strict Flatpak sandboxes
-            if [[ $i -ge 20 ]]; then
-                log "FLATPAK FALLBACK: Assuming window created after delay (wmctrl unavailable after $((i*50))ms)"
-                echo ""
-                return
-            fi
-            sleep 0.1
-            continue
-        fi
-        
-        # Buscar ventana que NO esté en la lista de exclusión
+        # Look for window not in exclusion list
         for w in "${current_windows[@]}"; do
             local is_old=false
             for old_w in "${exclude_windows[@]}"; do
@@ -405,28 +304,16 @@ apply_window_flags() {
         return
     fi
 
-    log "Applying window flags to $win_id (Flatpak: $IN_FLATPAK)"
+    log "Applying window flags to $win_id"
     
-    # Use robust window manager script for better reliability
-    if run_window_manager "remove-above" "$win_id" &>/dev/null; then
-        log "Successfully removed 'above' flag via window manager"
+    if wmctrl -i -r "$win_id" -b remove,above 2>/dev/null; then
+        log "Successfully removed 'above' flag"
     else
-        log "WARNING: Window manager failed to remove 'above' flag, trying direct wmctrl"
-        if wmctrl -i -r "$win_id" -b remove,above 2>/dev/null; then
-            log "Successfully removed 'above' flag via wmctrl"
-        else
-            log "CRITICAL: Failed to remove 'above' flag via all methods"
-        fi
+        log "WARNING: Failed to remove 'above' flag"
     fi
     
-    # Set below and skip_pager via window manager
-    if run_window_manager "set-below" "$win_id" &>/dev/null; then
-        log "Successfully set window to below state"
-    else
-        log "WARNING: Failed to set below state, trying direct wmctrl"
-        wmctrl -i -r "$win_id" -b add,skip_pager 2>/dev/null || log "WARNING: Failed to add 'skip_pager'"
-        wmctrl -i -r "$win_id" -b add,below 2>/dev/null || log "WARNING: Failed to add 'below'"
-    fi
+    wmctrl -i -r "$win_id" -b add,skip_pager 2>/dev/null || log "WARNING: Failed to add 'skip_pager'"
+    wmctrl -i -r "$win_id" -b add,below 2>/dev/null || log "WARNING: Failed to add 'below'"
 
     if [[ -n "$ACTIVE_WIN" ]]; then
         log "Restoring focus to previous window: $ACTIVE_WIN"
@@ -436,10 +323,8 @@ apply_window_flags() {
 
 
 ###############################################
-#  Aplicar wallpaper (CON TRANSICIÓN SUAVE)
+#  APPLY WALLPAPER
 # apply_wallpaper launches the wallpaper engine for the given wallpaper path, waits for the newly created window, applies window flags (and optionally restores focus), and closes any previous engine windows while logging progress and errors.
-#
-# FLATPAK ADAPTATION: Enhanced detection fallback for sandboxed environments
 apply_wallpaper() {
     local path="$1"
 
@@ -468,7 +353,7 @@ apply_wallpaper() {
     # Lanzamos el engine con todos los argumentos
     log "Executing: $ENGINE ${full_args[*]}"
     
-    # Handle ENGINE commands that might contain spaces (like "flatpak-spawn --host linux-wallpaperengine")
+    # Handle ENGINE commands that might contain spaces
     if [[ "$ENGINE" == *" "* ]]; then
         # ENGINE contains spaces, execute as shell command
         $ENGINE "${full_args[@]}" &
@@ -481,19 +366,12 @@ apply_wallpaper() {
     log "Engine launched with PID $new_pid"
     
     # Start background monitor to continuously try to apply window flags
-    # This is a workaround for Flatpak restrictions on wmctrl
-    # Uses flatpak-enter if available to access sandbox namespace
     if [[ "$REMOVE_ABOVE" == "true" ]]; then
         local monitor_script
         monitor_script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/window-monitor.sh"
         if [[ -f "$monitor_script" ]]; then
-            log "Starting background window monitor (REMOVE_ABOVE=true, Flatpak=$IN_FLATPAK)"
-            if [[ "$IN_FLATPAK" == "true" ]]; then
-                # Pass Flatpak app ID so monitor can use flatpak-enter
-                bash "$monitor_script" "$new_pid" "$REMOVE_ABOVE" "$LOG_FILE" "$FLATPAK_APP_ID" &
-            else
-                bash "$monitor_script" "$new_pid" "$REMOVE_ABOVE" "$LOG_FILE" &
-            fi
+            log "Starting background window monitor (REMOVE_ABOVE=true)"
+            bash "$monitor_script" "$new_pid" "$REMOVE_ABOVE" "$LOG_FILE" &
             local monitor_pid=$!
             log "Window monitor started with PID $monitor_pid"
         else
@@ -506,11 +384,7 @@ apply_wallpaper() {
     win_id=$(wait_for_window "${old_windows[@]}")
 
     if [[ -z "$win_id" ]]; then
-        log "WARNING: No window found for new engine (may be hidden or in Flatpak sandbox)"
-        # Store state for future reference even if we can't detect window
-        save_engine_state "$new_pid" "${old_windows[@]:-none}"
-        # In Flatpak, the process will still be running even if we can't detect the window
-        log "Proceeding without window detection (process running with PID $new_pid)"
+        log "ERROR: No window found for new engine"
         return
     fi
 
