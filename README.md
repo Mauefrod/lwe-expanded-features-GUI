@@ -494,7 +494,7 @@ def process_wallpapers(
 
 ---
 
-
+<details>
 ---
 
 ## 🚀 Implementing New Features
