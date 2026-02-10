@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+
 """
 Startup Manager for Linux Wallpaper Engine
 Handles application startup with saved configuration
@@ -9,32 +9,38 @@ import sys
 import os
 from pathlib import Path
 from datetime import datetime
+from ..common.constants import MAIN_SCRIPT_NAME
 
-# ==============================================================================
-# PATH SETUP
-# ==============================================================================
+# This hardcoded values could become an issue if you are working with custom envs. 
+# That being said, the main purpose of the whole "core" module is so that you can 
+# either run the app from the terminal via {MAIN_SCRIPT_NAME} / run.sh or so that when it comes to
+# coding you don't need to change the constants in the files, so consider this a burden
+# you have to bear when it comes to development.
+# Either that or refactor those modules or the constants... in which case, they are not 
+# constants. :)
 
-# This file is in source/core/
+# Be wary that I don't have a full logging class to handle all the scenarios you might want to log,
+# The logging is written with agent and I mostly handled common cases and some edge cases, 
+# I don't plan on expanding it since it's out of scope.
+
 SCRIPT_DIR = Path(__file__).parent.absolute()
-CORE_DIR = SCRIPT_DIR  # source/core/
-SOURCE_DIR = CORE_DIR.parent  # source/
+CORE_DIR = SCRIPT_DIR
+SOURCE_DIR = CORE_DIR.parent
 GUI_DIR = SOURCE_DIR / "gui"
 
-# Verify required directories exist
+
 if not GUI_DIR.exists():
     print(f"[FATAL ERROR] GUI directory not found: {GUI_DIR}")
     sys.exit(1)
 
-# Add directories to path for imports (order matters - SOURCE_DIR first for proper module resolution)
+
 sys.path.insert(0, str(SOURCE_DIR))
 sys.path.insert(0, str(GUI_DIR))
 sys.path.insert(0, str(CORE_DIR))
 
-# ==============================================================================
-# LOGGING SETUP
-# ==============================================================================
-
-# Path to log file (same as GUI uses)
+# You can set this logger to None if you don't want to log the startup process, but again... why??
+# You can also set custom callbacks using the logger functions in the common module... in case you do it,
+# Open an issue and I will provide support for it given that I like its implementation.
 LOG_DIR = Path.home() / ".local" / "share" / "linux-wallpaper-engine-features"
 LOG_FILE = LOG_DIR / "logs.txt"
 
@@ -56,42 +62,43 @@ def log(message):
     log_to_file(message)
 
 
-# ==============================================================================
-# ENVIRONMENT VALIDATION
-# ==============================================================================
-
 def validate_environment():
     """Validate that required environment variables are set"""
     log("[STARTUP] Validating environment...")
-    
+
     errors = []
-    
-    # Check DISPLAY is set
+
     if not os.environ.get("DISPLAY"):
         errors.append("DISPLAY is not set")
-    
-    # Check XAUTHORITY is set
+
     if not os.environ.get("XAUTHORITY"):
+        """I don't plan on explaining what XAUTHORITY is, in case you are a dev and have found bugs
+        in the startup process, but don't know what XAUTHORITY is, go read it's documentation, it's
+        really important when working with X11 and Desktop Environments on Linux.
+        If you are not a developer, and have found an XAUTHORITY error, open and issue and I will flag
+        it as high priority. 
+        
+        DO NOT TRY TO SET XAUTHORITY AS AN ENV VARIABLE, I WON'T SUPPORT IT AT ALL"""
+        
         errors.append("XAUTHORITY is not set (X11 may not be available)")
-    
-    # Check main.sh exists
-    main_script = CORE_DIR / "main.sh"
+
+    main_script = CORE_DIR / MAIN_SCRIPT_NAME
     if not main_script.exists():
-        errors.append(f"main.sh not found: {main_script}")
-    
+        errors.append(f"{MAIN_SCRIPT_NAME} not found: {main_script}")
+
     if errors:
         log("[WARNING] Environment issues detected:")
         for error in errors:
             log(f"  - {error}")
         return False
-    
+
     log("[STARTUP] Environment validation passed")
     return True
 
 
-# ==============================================================================
-# CONFIGURATION & EXECUTION
-# ==============================================================================
+
+
+
 
 def run_at_startup():
     """Main startup function"""
@@ -100,31 +107,27 @@ def run_at_startup():
     except ImportError as e:
         log(f"[FATAL ERROR] Failed to import config module: {e}")
         sys.exit(1)
-    
+
     log("[STARTUP] ========== Linux Wallpaper Engine Startup ==========")
     log(f"[STARTUP] Working directory: {CORE_DIR}")
     log(f"[STARTUP] User: {os.environ.get('USER', 'unknown')}")
     log(f"[STARTUP] Python: {sys.version.split()[0]}")
-    
-    # Validate environment
+
     if not validate_environment():
         log("[WARNING] Some environment variables are missing, continuing anyway...")
-    
-    # Load configuration
+
     try:
         config = load_config()
     except Exception as e:
         log(f"[ERROR] Failed to load configuration: {e}")
         sys.exit(1)
-    
+
     log("[STARTUP] Configuration loaded successfully")
-    
-    # Check if startup is enabled
+
     if not config.get("__run_at_startup__", False):
         log("[INFO] Run at startup is disabled - exiting gracefully")
         return
-    
-    # Log configuration
+
     log("[STARTUP] Configuration details:")
     log(f"[STARTUP]   Directory: {config.get('--dir', 'Not set')}")
     log(f"[STARTUP]   Window mode: {config.get('--window', {}).get('active', False)}")
@@ -137,68 +140,65 @@ def run_at_startup():
     log(f"[STARTUP]   Sound silent: {config.get('--sound', {}).get('silent', False)}")
     pool_size = len(config.get('--pool', []))
     log(f"[STARTUP]   Pool size: {pool_size} wallpapers")
-    
-    # Build arguments
+
     try:
         args = build_args(config, log_callback=log)
     except Exception as e:
         log(f"[ERROR] Failed to build arguments: {e}")
         sys.exit(1)
-    
+
     if not args:
         log("[WARNING] No valid arguments to run")
         log("[WARNING] Please configure a valid wallpaper directory")
         return
-    
-    # Verify main.sh exists and is executable
-    main_script = CORE_DIR / "main.sh"
-    
+
+    main_script = CORE_DIR / MAIN_SCRIPT_NAME 
+    # You could say this is a hardcoded value, if that's an issue for you,
+    # you can set the LWE_SCRIPT_DIR env variable to point to the directory containing the script
+    # regardless, like I said before, the main purpose of the whole "core" module is so that you can either run the app 
+    # from the terminal via main.sh or run.sh, so you do you.
+
     if not main_script.exists():
         log(f"[FATAL ERROR] Script not found: {main_script}")
         sys.exit(1)
-    
-    # Make it executable (in case permissions are wrong)
+
     try:
         mode = main_script.stat().st_mode
-        if not (mode & 0o111):  # Not executable
+        if not (mode & 0o111):
             log(f"[INFO] Making script executable: {main_script}")
             main_script.chmod(mode | 0o111)
     except Exception as e:
         log(f"[WARNING] Failed to set executable permissions: {e}")
-    
-    # Build and log the command
+
+
     cmd = [str(main_script)] + args
     cmd_str = " ".join(cmd)
     log(f"[STARTUP] Executing command:")
     log(f"[STARTUP]   {cmd_str}")
     log("[STARTUP] =========================================================")
-    
-    # Execute the wallpaper engine
+
     try:
-        # IMPORTANT: Execute from CORE_DIR so main.sh can find its dependencies
         result = subprocess.run(
-            cmd, 
-            check=False,  # Don't raise exception, we'll handle errors manually
+            cmd,
+            check=False,
             capture_output=True,
             text=True,
             cwd=str(CORE_DIR)
         )
-        
-        # Log output
+
         if result.stdout:
             log(f"[STARTUP] Output:\n{result.stdout}")
         if result.stderr:
             log(f"[STARTUP] Stderr:\n{result.stderr}")
-        
+
         if result.returncode == 0:
             log("[STARTUP] Wallpaper engine started successfully")
             return
         else:
             log(f"[WARNING] Command exited with code {result.returncode}")
             log("[WARNING] This may be normal if the engine daemonizes")
-            # Don't fail on non-zero exit (engine may have daemonized)
             return
-            
+
     except subprocess.CalledProcessError as e:
         log(f"[ERROR] Failed to run wallpaper engine")
         log(f"[ERROR] Return code: {e.returncode}")
@@ -221,6 +221,11 @@ if __name__ == "__main__":
     try:
         run_at_startup()
     except KeyboardInterrupt:
+        # I don't know if this is even remotely possible, 
+        # But in the chance that you are running the startup script from the terminal,
+        # Or you set some weird keyboard shortcut to run / stop it, this should be good enough,
+        # If it isn't, open and issue and i will provide you documenation of the built keyboard API,
+        # Or provide support altogether :)
         log("[STARTUP] Interrupted by user")
         sys.exit(1)
     except Exception as e:

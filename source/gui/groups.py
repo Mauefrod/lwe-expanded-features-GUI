@@ -1,12 +1,14 @@
 """
 Backward compatibility wrapper for group management.
 Actual implementation now in models.groups
+As you may imagine at this point, this is a wrapper, and works SOLELY as an astraction layer
+If you want to add features or change the way groups are managed, override the functions in the actual codebase
 """
 from models.groups import GroupManager
 from common.logger import set_logger_callback
 
 
-# Global instance for module-level API
+
 _group_manager = None
 
 

@@ -4,10 +4,13 @@ Traditional Linux Keyboard Shortcut API
 Provides a clean, standard API for managing keyboard shortcuts using traditional
 Linux keyboard handling via Tkinter's native key binding mechanism (no system-wide
 hotkey interception).
+
+As it is pretty obvious, this API was coded by AGENT, I don't plan on supporting it since I will be 
+focusing on refactoring the native one, this is just a fix for anyone that might need CLI usage (why? Linux weirdos)
 """
 
 from typing import Callable, Dict, Optional, List, Any
-from models.keybindings import KeybindingAction, Keybinding, KeyModifier
+from models.keybindings import KeybindingAction
 
 
 class KeyboardShortcutAPI:
@@ -27,7 +30,7 @@ class KeyboardShortcutAPI:
         api.on_action_handler(KeybindingAction.RUN_CURRENT_CONFIG, my_handler_func)
         api.sync_to_window(main_window)
     """
-    
+
     def __init__(self, config: Dict, log_callback: Callable = None):
         """
         Initialize the keyboard shortcut API.
@@ -41,12 +44,12 @@ class KeyboardShortcutAPI:
         self.bindings: Dict[KeybindingAction, Dict[str, Any]] = {}
         self.handlers: Dict[KeybindingAction, Callable] = {}
         self._bound_window = None
-        
+
         self._load_bindings_from_config()
         self.log("[KB API] KeyboardShortcutAPI initialized")
-    
+
     def bind_action(
-        self, 
+        self,
         action: KeybindingAction,
         key: str,
         modifiers: Optional[List[str]] = None
@@ -70,7 +73,7 @@ class KeyboardShortcutAPI:
         }
         self.log(f"[KB API] Bound {action.value}: {key} + {modifiers}")
         self._sync_binding_to_window(action)
-    
+
     def unbind_action(self, action: KeybindingAction) -> None:
         """
         Remove a keyboard shortcut binding.
@@ -83,7 +86,7 @@ class KeyboardShortcutAPI:
             if self._bound_window:
                 self._unbind_from_window(action)
             self.log(f"[KB API] Unbound {action.value}")
-    
+
     def on_action_handler(
         self,
         action: KeybindingAction,
@@ -104,7 +107,7 @@ class KeyboardShortcutAPI:
         """
         self.handlers[action] = handler
         self.log(f"[KB API] Registered handler for {action.value}")
-    
+
     def get_binding(self, action: KeybindingAction) -> Optional[Dict[str, Any]]:
         """
         Get the current binding for an action.
@@ -117,7 +120,7 @@ class KeyboardShortcutAPI:
             # {'key': 'r', 'modifiers': ['ctrl', 'alt']}
         """
         return self.bindings.get(action)
-    
+
     def get_binding_string(self, action: KeybindingAction) -> Optional[str]:
         """
         Get human-readable binding string for an action.
@@ -128,11 +131,11 @@ class KeyboardShortcutAPI:
         binding = self.bindings.get(action)
         if not binding:
             return None
-        
+
         parts = [m.capitalize() for m in binding['modifiers']]
         parts.append(self._format_key(binding['key']))
         return "+".join(parts)
-    
+
     def get_all_bindings(self) -> Dict[str, str]:
         """
         Get all current bindings as human-readable strings.
@@ -153,7 +156,7 @@ class KeyboardShortcutAPI:
             if binding_str:
                 result[action.value] = binding_str
         return result
-    
+
     def sync_to_window(self, main_window) -> None:
         """
         Synchronize all bindings to a Tkinter window.
@@ -170,7 +173,7 @@ class KeyboardShortcutAPI:
         self._bound_window = main_window
         main_window.bind("<KeyPress>", self._on_tkinter_key_press)
         self.log(f"[KB API] Synced {len(self.bindings)} bindings to window")
-    
+
     def save_config(self) -> None:
         """
         Save current bindings to configuration.
@@ -183,32 +186,32 @@ class KeyboardShortcutAPI:
                 'key': binding['key'],
                 'modifiers': binding['modifiers']
             }
-        
+
         self.config["--keybindings"] = config_data
         self.log("[KB API] Bindings saved to config")
-    
+
     def reset_to_defaults(self) -> None:
         """Reset all bindings to application defaults."""
         self.bindings.clear()
         self._load_bindings_from_config()
-        
-        # Re-sync if window is bound
+
+
         if self._bound_window:
             self.sync_to_window(self._bound_window)
-        
+
         self.log("[KB API] Bindings reset to defaults")
-    
-    # ========== Internal Methods ==========
-    
+
+
+
     def _load_bindings_from_config(self) -> None:
         """Load bindings from configuration."""
         self.bindings.clear()
-        
+
         if "--keybindings" not in self.config:
             return
-        
+
         keybindings_config = self.config.get("--keybindings", {})
-        
+
         for action_name, binding_data in keybindings_config.items():
             try:
                 action = KeybindingAction(action_name)
@@ -219,74 +222,71 @@ class KeyboardShortcutAPI:
                 }
             except ValueError:
                 self.log(f"[KB API] Unknown action: {action_name}")
-    
+
     def _on_tkinter_key_press(self, event) -> None:
         """Handle Tkinter key press events."""
         try:
             key = event.keysym
             modifiers = self._extract_modifiers(event)
-            
-            # Find matching binding
+
+
             for action, binding in self.bindings.items():
-                if (binding['key'] == key and 
+                if (binding['key'] == key and
                     set(binding['modifiers']) == set(modifiers)):
                     self._execute_action(action)
                     return
         except Exception as e:
             self.log(f"[KB API ERROR] {str(e)}")
-    
+
     def _execute_action(self, action: KeybindingAction) -> None:
         """Execute the handler for an action."""
         if action not in self.handlers:
             return
-        
+
         try:
             handler = self.handlers[action]
             import threading
-            # Run in separate thread to avoid blocking UI
+
             thread = threading.Thread(target=handler, daemon=True)
             thread.start()
             self.log(f"[KB API] Executed action: {action.value}")
         except Exception as e:
             self.log(f"[KB API ERROR] Failed to execute {action.value}: {str(e)}")
-    
+
     def _sync_binding_to_window(self, action: KeybindingAction) -> None:
         """Sync a single binding to the window if it's bound."""
         if not self._bound_window:
             return
-        
+
         binding = self.bindings.get(action)
         if not binding:
             return
-        
-        # Tkinter uses angle bracket notation for bindings
-        # Extract current window implementation to unbind old and bind new
+
+
+
         self._unbind_from_window(action)
-    
+
     def _unbind_from_window(self, action: KeybindingAction) -> None:
         """Unbind an action from the window."""
         if not self._bound_window:
             return
         
-        # Get all current bindings and remove this action's bindings
-        # Note: Tkinter doesn't provide a direct way to unbind by action,
-        # so we re-bind all when there are changes
         pass
-    
+
     @staticmethod
     def _extract_modifiers(event) -> List[str]:
         """Extract modifier keys from a Tkinter event."""
         modifiers = []
-        if event.state & 0x0004:  # Ctrl
+        if event.state & 0x0004:
             modifiers.append('ctrl')
-        if event.state & 0x0008:  # Alt
+        if event.state & 0x0008:
             modifiers.append('alt')
-        if event.state & 0x0001:  # Shift
+        if event.state & 0x0001:
             modifiers.append('shift')
-        if event.state & 0x0040:  # Super/Windows key
+        if event.state & 0x0040:
             modifiers.append('super')
         return modifiers
-    
+
     @staticmethod
     def _format_key(key: str) -> str:
         """Format key name for display."""

@@ -33,17 +33,28 @@
 
 <details>
 
+### Core Features
 - 🖼️ **Visual Gallery** - Browse wallpapers with thumbnail previews
 - 📁 **Group Organization** - Create and manage wallpaper groups/collections
 - ⭐ **Favorites System** - Quick access to your preferred wallpapers
-- 🎲 **Random Mode** - Automatic wallpaper rotation with customizable intervals
+- 🎲 **Random Mode** - Automatic wallpaper rotation  
 - ⏱️ **Delay/Timer Mode** - Set wallpapers to change at specific time intervals
 - 🪟 **Window Mode** - Run wallpapers as actual windows with custom resolutions
 - 🔼 **Always-on-Top Control** - Toggle window layering behavior
-- � **Advanced Sound Control** - Manage audio playback with multiple sound options
-- �📊 **Real-time Logging** - Monitor application and engine activity
-- 💾 **Persistent Configuration** - Remember your preferences across sessions
- - 🔁 **Toggleable Sections** - Most UI panels and sections can be shown or hidden to simplify the interface and improve readability
+- 🔊 **Advanced Sound Control** - Multiple audio options including silent, noautomute, and no audio processing
+- 📊 **Real-time Logging** - Monitor application and engine activity
+- 💾 **Persistent Configuration** - Settings saved to `~/.config/linux-wallpaper-engine-features/config.json`
+- 🔁 **Collapsible UI Sections** - Show or hide panels to customize the interface
+- ⌨️ **Keybinding Support** - Custom keyboard shortcuts for actions
+- 🚀 **Startup Integration** - Option to run wallpaper automatically on system boot via systemd
+
+### Architecture Features
+- **Backward Compatibility Wrappers** - `gui/` modules provide stable APIs for underlying services
+- **Type Annotations** - Full Python type hints for better IDE support and code clarity
+- **Modular Services** - Business logic separated from GUI presentation
+- **Event-Driven Architecture** - Central event handler for user interactions
+- **Configuration Persistence** - JSON-based configuration with defaults
+- **Process Management** - Direct control over wallpaper engine lifecycle
 
 </details>
 
@@ -305,12 +316,177 @@ cd source
 python3 GUI.py
 ```
 
-### Code Structure
+### Code Structure & Architecture
 
-The application follows an MVC-like pattern:
-- **Model**: Configuration and data management
-- **View**: UI components and gallery visualization
-- **Controller**: GUI engine and event handlers
+The application uses a **layered architecture** with separation of concerns:
+
+```
+┌─────────────────────┐
+│   GUI Layer         │  (gui_engine.py, ui_components/)
+│   (Presentation)    │
+└──────────┬──────────┘
+           │
+┌──────────v──────────┐
+│  Handler Layer      │  (event_handler/, gallery_view/)
+│  (User Interaction) │
+└──────────┬──────────┘
+           │
+┌──────────v──────────┐
+│  Service Layer      │  (services/)
+│  (Business Logic)   │
+└──────────┬──────────┘
+           │
+┌──────────v──────────┐
+│  Model Layer        │  (models/)
+│  (Data Management)  │
+└──────────┬──────────┘
+           │
+┌──────────v──────────┐
+│  Backend Engine     │  (linux-wallpaperengine)
+│  (Process Control)  │
+└─────────────────────┘
+```
+
+### Module Organization
+
+- **`gui/`** - GUI presentation layer and wrappers
+  - `gui_engine.py` - Main orchestrator that coordinates all GUI components
+  - `config.py` - Backward compatibility wrapper for configuration
+  - `groups.py` - Backward compatibility wrapper for group management
+  - `wallpaper_loader.py` - Backward compatibility wrapper for wallpaper loading
+  - `engine_controller.py` - Backward compatibility wrapper for engine control
+  - `event_handler/` - Event processing and user interaction handling
+  - `gallery_view/` - Gallery display and management
+  - `ui_components/` - Reusable UI widgets (buttons, panels, controls)
+
+- **`services/`** - Business logic and service layer
+  - `engine_controller.py` - Core engine control (start/stop, process management)
+  - `argument_builder.py` - Builds CLI arguments for the backend
+  - `wallpaper_service.py` - Wallpaper discovery and preview loading
+  - `keybinding_service.py` - Keybinding management
+
+- **`models/`** - Data models and persistence
+  - `config.py` - Configuration management with load/save
+  - `groups.py` - Group/collection management
+  - `keybindings.py` - Keybinding data structures
+
+- **`common/`** - Shared utilities
+  - `logger.py` - Centralized logging
+  - `constants.py` - Application constants and configurations
+  - `validators.py` - Input validation
+  - `path_helpers.py` - Path resolution utilities
+
+### Adding New Features
+
+#### 1. Add a Simple Toggle Option
+
+Example: Adding a new sound control option
+
+```python
+# 1. Add to models/config.py DEFAULT_CONFIG
+"--sound": {
+    "silent": False,
+    "noautomute": False,
+    "no_audio_processing": False,
+    "my_new_option": False  # <- Add here
+}
+
+# 2. Create UI component in gui/ui_components/
+class MyNewPanel:
+    """Manages my new feature controls"""
+    
+    def __init__(self, parent: Tk):
+        self.my_var = BooleanVar(value=False)
+        self.checkbox = Checkbutton(parent, text="My Option", variable=self.my_var)
+    
+    def grid(self, **kwargs) -> None:
+        """Position the panel"""
+        self.checkbox.grid(**kwargs)
+
+# 3. Add to gui/gui_engine.py initialization
+self.my_panel = MyNewPanel(self.main_window)
+self.my_panel.grid(column=1, row=2, sticky="nsew")
+
+# 4. Create event handler in gui/event_handler/event_handler.py
+def on_my_option_changed(self) -> None:
+    """Handle my option change"""
+    self.config["--my_new_option"] = self.ui['my_panel'].my_var.get()
+    save_config(self.config)
+    if self.ui.get('on_execute'):
+        self.ui['on_execute']()
+
+# 5. Connect callback in gui/gui_engine.py _connect_callbacks()
+self.my_panel.checkbox.config(command=self.event_handlers.on_my_option_changed)
+
+# 6. Update argument_builder.py to pass to backend
+def _add_my_option_arg(self, args: List[str]) -> List[str]:
+    """Add my option argument if enabled"""
+    if self.config.get("--my_new_option", False):
+        args.append("--my-option")
+    return args
+```
+
+#### 2. Add a Search/Filter Feature
+
+Create a new module in `gui/ui_components/search_panel.py`:
+
+```python
+from tkinter import Entry, Frame, StringVar
+
+class SearchPanel:
+    """Manages wallpaper search and filtering"""
+    
+    def __init__(self, parent, on_search_callback):
+        self.search_var = StringVar()
+        self.search_var.trace("w", lambda *args: on_search_callback(self.search_var.get()))
+        
+        self.frame = Frame(parent)
+        self.entry = Entry(self.frame, textvariable=self.search_var)
+        self.entry.pack()
+    
+    def grid(self, **kwargs) -> None:
+        self.frame.grid(**kwargs)
+    
+    def get_search_term(self) -> str:
+        return self.search_var.get()
+```
+
+#### 3. Type Annotations Best Practices
+
+- Always annotate function parameters and return types
+- Use `Optional[T]` for nullable values
+- Use `List[T]`, `Dict[K,V]` from `typing` module  
+- Use `Union[T1, T2]` for multiple types
+- Add type comments for complex logic
+
+```python
+from typing import Optional, List, Dict, Callable, Any
+
+def process_wallpapers(
+    root_dir: str,
+    filter_fn: Optional[Callable[[str], bool]] = None,
+    on_complete: Optional[Callable[[List[str]], None]] = None
+) -> List[str]:
+    """
+    Process wallpapers with optional filtering.
+    
+    Args:
+        root_dir: Root wallpaper directory path
+        filter_fn: Optional filter function
+        on_complete: Optional completion callback
+    
+    Returns:
+        List of wallpaper IDs
+    """
+    pass
+```
+
+### Design Patterns Used
+
+1. **Wrapper Pattern** - `gui/` modules wrap `services/` and `models/` modules
+2. **Observer Pattern** - Event callbacks connect UI to handlers
+3. **Singleton Pattern** - Global `DEFAULT_CONFIG` object
+4. **Facade Pattern** - `gui_engine.py` provides unified interface to GUI components
 
 ---
 
@@ -319,7 +495,242 @@ The application follows an MVC-like pattern:
 ---
 
 
-## 🐛 Troubleshooting
+---
+
+## 🚀 Implementing New Features
+
+<details>
+
+### Quick Start Guide
+
+When adding a new feature to the application, follow this workflow:
+
+#### Step 1: Define Data Model
+Add configuration structure in `models/config.py`:
+
+```python
+DEFAULT_CONFIG = {
+    # ... existing config
+    "--my-feature": {
+        "enabled": False,
+        "option1": "",
+        "option2": 0
+    }
+}
+```
+
+#### Step 2: Create Service Layer
+Implement business logic in `services/my_service.py`:
+
+```python
+"""My feature service implementation"""
+from typing import Optional, List, Dict, Any
+
+class MyFeatureService:
+    """Handles my feature logic"""
+    
+    def __init__(self, config: Dict[str, Any]):
+        self.config = config
+    
+    def process(self, data: str) -> Optional[str]:
+        """Process feature logic"""
+        if not self.config["--my-feature"]["enabled"]:
+            return None
+        return data.upper()
+```
+
+#### Step 3: Create UI Component
+Create widget in `gui/ui_components/my_feature_panel.py`:
+
+```python
+"""UI panel for my feature"""
+from tkinter import Frame, BooleanVar, StringVar, Checkbutton, Entry, Label
+from typing import Callable, Optional
+
+class MyFeaturePanel:
+    """Manages my feature controls"""
+    
+    def __init__(self, parent: Frame):
+        self.frame = Frame(parent, bg="#1F0120")
+        self.enabled = BooleanVar(value=False)
+        
+        self._setup_widgets()
+    
+    def _setup_widgets(self) -> None:
+        """Initialize UI widgets"""
+        self.checkbox = Checkbutton(
+            self.frame,
+            text="Enable My Feature",
+            variable=self.enabled,
+            bg="#1F0120",
+            fg="#FFFFFF"
+        )
+        self.checkbox.pack(padx=5, pady=5)
+    
+    def grid(self, **kwargs) -> None:
+        """Position the panel"""
+        self.frame.grid(**kwargs)
+    
+    def get_state(self) -> bool:
+        """Get current feature state"""
+        return self.enabled.get()
+```
+
+#### Step 4: Create Event Handler
+Add handler method in `gui/event_handler/event_handler.py`:
+
+```python
+def on_my_feature_changed(self) -> None:
+    """Handle my feature state change"""
+    feature_panel = self.ui.get('my_feature_panel')
+    if feature_panel:
+        self.config["--my-feature"]["enabled"] = feature_panel.get_state()
+        save_config(self.config)
+        self.log("[HANDLER] My feature changed")
+        
+        if self.ui.get('on_execute'):
+            self.ui['on_execute']()
+```
+
+#### Step 5: Integrate in Main GUI
+Update `gui/gui_engine.py`:
+
+```python
+# In _create_ui()
+from gui.ui_components.my_feature_panel import MyFeaturePanel
+
+self.my_feature_panel = MyFeaturePanel(self.main_window)
+self.my_feature_panel.grid(column=1, row=3, sticky="nsew", padx=5, pady=5)
+
+# In _create_managers() - add to ui_components dict
+ui_components['my_feature_panel'] = self.my_feature_panel
+
+# In _connect_callbacks()
+if hasattr(self.my_feature_panel, 'checkbox'):
+    self.my_feature_panel.checkbox.config(
+        command=self.event_handlers.on_my_feature_changed
+    )
+```
+
+#### Step 6: Update Backend Integration (if needed)
+Modify `services/argument_builder.py`:
+
+```python
+def _add_my_feature_arg(self, args: List[str]) -> List[str]:
+    """Add my feature argument if configured"""
+    if self.config.get("--my-feature", {}).get("enabled", False):
+        args.append("--my-feature")
+        option = self.config["--my-feature"].get("option1")
+        if option:
+            args.extend(["--my-feature-option", option])
+    return args
+
+# Call from build_arguments()
+def build_arguments(self) -> List[str]:
+    args = []
+    # ... existing code ...
+    args = self._add_my_feature_arg(args)
+    return args
+```
+
+### Code Quality Guidelines
+
+#### Type Annotations
+Always use type hints:
+```python
+from typing import Optional, List, Dict, Callable, Any, Union
+
+def my_function(
+    param1: str,
+    param2: Optional[int] = None,
+    callback: Optional[Callable[[str], None]] = None
+) -> Dict[str, Any]:
+    """Function with type annotations"""
+    return {}
+```
+
+#### Docstrings
+Use descriptive docstrings:
+```python
+def process_wallpaper(wallpaper_id: str) -> bool:
+    """
+    Process and apply a wallpaper.
+    
+    Args:
+        wallpaper_id: Unique wallpaper identifier
+    
+    Returns:
+        True if successfully applied, False otherwise
+    
+    Raises:
+        FileNotFoundError: If wallpaper directory not found
+    """
+    pass
+```
+
+#### Comments
+Add comments only where logic is non-obvious:
+```python
+# Calculate optimal thumbnail width based on screen size and column count
+available_width = screen_width - (padding_per_thumb * desired_columns)
+thumb_width = max(THUMB_MIN_WIDTH, available_width // desired_columns)
+```
+
+#### Error Handling
+Always handle exceptions appropriately:
+```python
+try:
+    result = self.service.process(data)
+except ValueError as e:
+    self.log(f"[ERROR] Invalid data: {e}")
+    return False
+except Exception as e:
+    self.log(f"[ERROR] Unexpected error: {e}")
+    import traceback
+    self.log(f"[ERROR] Traceback:\n{traceback.format_exc()}")
+    return False
+```
+
+### Testing Your Feature
+
+1. **Manual Testing**:
+   ```bash
+   cd source
+   python3 GUI.py
+   ```
+
+2. **Check Logs**:
+   ```bash
+   tail -f ~/.local/share/linux-wallpaper-engine-features/logs.txt
+   ```
+
+3. **Verify Configuration**:
+   ```bash
+   cat ~/.config/linux-wallpaper-engine-features/config.json | python3 -m json.tool
+   ```
+
+### Common Pitfalls
+
+- ❌ **Not translating docstrings to English** - All new code should use English
+- ❌ **Missing type annotations** - Add types for all function parameters and returns
+- ❌ **Hardcoding values** - Use `models/config.py` for constants
+- ❌ **Not updating config model** - Always update `DEFAULT_CONFIG` first
+- ❌ **Skipping error handling** - Wrap external operations in try/except
+- ❌ **Not logging user actions** - Use `self.log()` for debugging
+
+### Updating Wrappers
+
+When modifying service layer, remember to update the wrapper in `gui/`:
+
+```python
+# In gui/config.py or gui/groups.py
+def my_new_function(config, param):
+    """Backward compatibility wrapper"""
+    manager = MyManager(config)
+    return manager.do_something(param)
+```
+
+</details>
 
 <details>
 
@@ -375,7 +786,6 @@ Configuration is stored in `~/.config/linux-wallpaper-engine-features/config.jso
 ### Original Project
 This project builds upon and extends:
 - **[linux-wallpaperengine](https://github.com/Acters/linux-wallpaperengine)** - A CLI tool to apply Wallpaper Engine projects on Linux
-   - Created by [Acters](https://github.com/Acters)
    - A fantastic port of the Wallpaper Engine experience to Linux
 
 ### Key Technologies
@@ -422,7 +832,6 @@ Contributions are welcome! Here's how you can help:
 
 ---
 
-## 📞 Support
 
 <details>
 

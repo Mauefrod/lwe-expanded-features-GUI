@@ -1,4 +1,7 @@
 """Validators for common operations"""
+"""Mostly a wrapper for os.path functions, could also be inherited in path_helpers if you want to build a supperclass,
+but this is just overengeenring, and i don't consider it useful at all, so I will just leave it as is for now, if you  
+need to implement something else, just do it in this file"""
 
 import os
 from os import path
@@ -17,26 +20,26 @@ def validate_directory(dir_path, log_callback=None):
     """
     if not dir_path:
         return False, "No directory path specified"
-    
+
     if not path.exists(dir_path):
         error_msg = f"Directory does not exist: {dir_path}"
         if log_callback:
             log_callback(f"[WARNING] {error_msg}")
         return False, error_msg
-    
+
     if not path.isdir(dir_path):
         error_msg = f"Path is not a directory: {dir_path}"
         if log_callback:
             log_callback(f"[WARNING] {error_msg}")
         return False, error_msg
-    
-    # Check read permissions
+
+
     if not os.access(dir_path, os.R_OK):
         error_msg = f"Directory is not readable: {dir_path}"
         if log_callback:
             log_callback(f"[WARNING] {error_msg}")
         return False, error_msg
-    
+
     return True, None
 
 
@@ -77,11 +80,11 @@ def validate_resolution(resolution):
     """
     if not isinstance(resolution, str):
         return False
-    
+
     parts = resolution.split('x')
     if len(parts) != 4:
         return False
-    
+
     try:
         for part in parts:
             int(part)

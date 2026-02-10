@@ -20,7 +20,7 @@ __all__ = [
 ]
 
 
-# Backward compatible function wrappers
+
 def count_all_wallpapers(root_dir, loader):
     """Backward compatibility wrapper"""
     return WallpaperFinder.count_all(root_dir, loader)

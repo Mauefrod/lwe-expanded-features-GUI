@@ -1,7 +1,7 @@
 """Configuration management and persistence"""
-
+"""This is probably the best representation of how the main.sh script works, as this is the abstracted version
+in python used for handling all the flags, normalizing data... etc."""
 import json
-import os
 from os import path, makedirs
 
 from common.constants import CONFIG_PATH, RESOLUTIONS
@@ -40,26 +40,26 @@ DEFAULT_CONFIG = {
 
 class ConfigManager:
     """Handles configuration loading, saving, and merging"""
-    
+
     @staticmethod
     def load():
         """Load configuration from file"""
         if not path.exists(CONFIG_PATH):
             return DEFAULT_CONFIG.copy()
-        
+
         try:
             with open(CONFIG_PATH, "r") as f:
                 return json.load(f)
         except Exception:
             return DEFAULT_CONFIG.copy()
-    
+
     @staticmethod
     def save(config):
         """Save configuration to file"""
         makedirs(path.dirname(CONFIG_PATH), exist_ok=True)
         with open(CONFIG_PATH, "w") as f:
             json.dump(config, f, indent=4)
-    
+
     @staticmethod
     def merge(defaults, loaded):
         """Recursively merge loaded config into defaults"""
@@ -75,7 +75,7 @@ class ConfigManager:
 
 class ConfigValidator:
     """Validates and normalizes configuration values"""
-    
+
     @staticmethod
     def validate_directory_config(config):
         """Validate directory path in config"""
@@ -90,18 +90,22 @@ class ConfigValidator:
                 config["--dir"] = None
                 return False
         return True
-    
+
     @staticmethod
     def validate_resolution(resolution):
         """Check if resolution format is valid"""
         if resolution not in RESOLUTIONS:
+            """I don't really know how you would manage to get False in here... but just in case"""
+            """So far the resolution values are set as constants in the codebase following the format:
+            0x0xwidthxheight, i don't know what the first two 0s are for, but the actual linux-wallpaperengine handles
+            it this way"""
             return False
         return True
 
 
 class ConfigUpdater:
     """Handles configuration state updates"""
-    
+
     @staticmethod
     def update_set_flag(config):
         """Update --set flag based on random and delay state"""
@@ -113,14 +117,14 @@ class ConfigUpdater:
             dir_path = config["--dir"]
             if dir_path:
                 config["--set"]["wallpaper"] = path.basename(dir_path)
-    
+
     @staticmethod
     def set_directory(config, dir_path):
         """Update directory and related flags"""
         config["--dir"] = dir_path
         ConfigUpdater.update_set_flag(config)
         ConfigManager.save(config)
-    
+
     @staticmethod
     def set_random_mode(config, active):
         """Update random mode"""
@@ -129,7 +133,7 @@ class ConfigUpdater:
             config["--delay"]["active"] = False
             config["--set"]["active"] = False
         ConfigUpdater.update_set_flag(config)
-    
+
     @staticmethod
     def set_delay_mode(config, active, timer=None):
         """Update delay mode"""
@@ -140,20 +144,24 @@ class ConfigUpdater:
             config["--random"] = False
             config["--set"]["active"] = False
         ConfigUpdater.update_set_flag(config)
-    
+
     @staticmethod
     def set_window_mode(config, active, resolution=None):
         """Update window mode"""
         config["--window"]["active"] = active
         if resolution:
             config["--window"]["res"] = resolution
-    
+
     @staticmethod
     def set_above_flag(config, active):
         """Update above flag"""
         config["--above"] = active
-    
+
     @staticmethod
     def set_startup(config, active):
         """Update startup flag"""
         config["__run_at_startup__"] = active
+        
+        
+    # You can implement more methods for whatever you need in here ;) 
+    # If you need any tips, refer to the documentation or open an issue

@@ -3,7 +3,6 @@
 from subprocess import Popen, PIPE
 from threading import Thread
 import os
-from os import path
 
 from common.path_helpers import get_script_path
 from common.logger import get_logger
@@ -12,13 +11,13 @@ from models.config import ConfigManager
 
 class EngineController:
     """Controls the wallpaper engine process"""
-    
+
     def __init__(self, config):
         self.config = config
         self.logger = get_logger()
         self.script_path = None
         self._initialize_script_path()
-    
+
     def _initialize_script_path(self):
         """Initialize and validate script path"""
         try:
@@ -28,20 +27,20 @@ class EngineController:
             error_msg = f"Cannot locate engine script: {str(e)}"
             self.logger.component("ENGINE", error_msg, "ERROR")
             self.script_path = None
-    
+
     def stop_engine(self):
         """Stop the current wallpaper engine process"""
         self.logger.component("ENGINE", "Stopping previous engine...")
-        
+
         if not self.script_path:
             self.logger.component("ENGINE", "Script path not available, cannot stop engine", "WARNING")
             return
-        
+
         try:
             if not os.path.exists(self.script_path):
                 self.logger.component("ENGINE", f"Script not found at: {self.script_path}", "ERROR")
                 return
-            
+
             stop_proc = Popen(
                 [self.script_path, "--stop"],
                 stdout=PIPE,
@@ -49,14 +48,14 @@ class EngineController:
                 text=True
             )
             stdout, stderr = stop_proc.communicate()
-            
+
             if stop_proc.returncode != 0 and stderr:
                 self.logger.component("ENGINE", f"Stop engine error: {stderr}", "ERROR")
             else:
                 self.logger.component("ENGINE", "Previous engine stopped")
         except Exception as e:
             self.logger.component("ENGINE", f"Failed to stop engine: {str(e)}", "ERROR")
-    
+
     def run_engine(self, arguments):
         """
         Run the wallpaper engine with given arguments
@@ -70,39 +69,36 @@ class EngineController:
         if not self.script_path:
             self.logger.component("ENGINE", "Cannot run engine: Script path not available", "ERROR")
             return False
-        
+
         try:
-            # Save config before running
             ConfigManager.save(self.config)
-            
-            # Build command
+
             cmd = [self.script_path] + arguments
-            
-            # Run in background thread
+
             thread = Thread(target=self._run_process, args=(cmd,), daemon=True)
             thread.start()
-            
+
             self.logger.component("ENGINE", f"Engine started with args: {' '.join(arguments)}")
             return True
-        
+
         except Exception as e:
             self.logger.component("ENGINE", f"Error running engine: {str(e)}", "ERROR")
             return False
-    
+
     def _run_process(self, cmd):
         """Execute the process (runs in background thread)"""
         try:
             proc = Popen(cmd, stdout=PIPE, stderr=PIPE, text=True)
             stdout, stderr = proc.communicate()
-            
+
             if stdout:
                 self.logger.component("ENGINE", f"Output: {stdout}")
             if stderr:
                 self.logger.component("ENGINE", f"Error: {stderr}", "WARNING")
-            
+
         except Exception as e:
             self.logger.component("ENGINE", f"Process error: {str(e)}", "ERROR")
-    
+
     def update_pool(self, item_list, current_view):
         """
         Update the wallpaper pool based on current view
@@ -114,9 +110,9 @@ class EngineController:
         if not (self.config["--random"] or self.config["--delay"]["active"]):
             self.config["--pool"] = []
             return
-        
+
         if current_view != "wallpapers":
             self.config["--pool"] = []
             return
-        
+
         self.config["--pool"] = item_list.copy() if item_list else []
