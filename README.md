@@ -731,7 +731,7 @@ def my_new_function(config, param):
 ```
 
 </details>
-
+---
 <details>
 
 ### Application won't start
