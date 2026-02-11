@@ -494,7 +494,7 @@ def process_wallpapers(
 
 ---
 
-
+<details>
 ---
 
 ## 🚀 Implementing New Features
@@ -731,7 +731,7 @@ def my_new_function(config, param):
 ```
 
 </details>
-
+---
 <details>
 
 ### Application won't start
