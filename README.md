@@ -800,6 +800,7 @@ This project builds upon and extends:
 - All contributors and users providing feedback and improvements
 
 ---
+</details>
 
 ## 📄 License
 
