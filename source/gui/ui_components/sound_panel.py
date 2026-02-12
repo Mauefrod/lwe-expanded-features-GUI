@@ -1,4 +1,5 @@
 from tkinter import Frame, Label, BooleanVar, Checkbutton
+from common.constants import UI_COLORS
 
 
 class SoundPanel:
@@ -7,20 +8,20 @@ class SoundPanel:
     def __init__(self, parent):
         self.frame = Frame(
             parent,
-            bg="#0a0e27",
+            bg=UI_COLORS["bg_secondary"],
             bd=2,
             relief="solid",
             highlightthickness=2,
-            highlightcolor="#440044",
-            highlightbackground="#440044"
+            highlightcolor=UI_COLORS["accent_purple"],
+            highlightbackground=UI_COLORS["accent_purple"]
         )
 
 
         title_label = Label(
             self.frame,
             text="🔊 SOUND",
-            bg="#0a0e27",
-            fg="#FFFFFF",
+            bg=UI_COLORS["bg_secondary"],
+            fg=UI_COLORS["fg_text"],
             font=("Arial", 10, "bold")
         )
         title_label.grid(column=0, row=0, columnspan=2, pady=(5, 10), sticky="w", padx=5)
@@ -35,12 +36,12 @@ class SoundPanel:
             self.frame,
             text="Silent (mute all)",
             variable=self.silent,
-            bg="#0a0e27",
-            fg="#FFFFFF",
+            bg=UI_COLORS["bg_secondary"],
+            fg=UI_COLORS["fg_text"],
             font=("Arial", 9),
-            activebackground="#0a0e27",
-            activeforeground="#ff3333",
-            selectcolor="#0a0e27"
+            activebackground=UI_COLORS["bg_secondary"],
+            activeforeground=UI_COLORS["accent_red"],
+            selectcolor=UI_COLORS["bg_secondary"]
         )
         self.silent_checkbox.grid(column=0, row=1, columnspan=2, padx=5, pady=3, sticky="w")
 
@@ -49,12 +50,12 @@ class SoundPanel:
             self.frame,
             text="No auto mute",
             variable=self.noautomute,
-            bg="#0a0e27",
-            fg="#FFFFFF",
+            bg=UI_COLORS["bg_secondary"],
+            fg=UI_COLORS["fg_text"],
             font=("Arial", 9),
-            activebackground="#0a0e27",
-            activeforeground="#ff3333",
-            selectcolor="#0a0e27"
+            activebackground=UI_COLORS["bg_secondary"],
+            activeforeground=UI_COLORS["accent_red"],
+            selectcolor=UI_COLORS["bg_secondary"]
         )
         self.noautomute_checkbox.grid(column=0, row=2, columnspan=2, padx=5, pady=3, sticky="w")
 
@@ -63,12 +64,12 @@ class SoundPanel:
             self.frame,
             text="No audio processing",
             variable=self.no_audio_processing,
-            bg="#0a0e27",
-            fg="#FFFFFF",
+            bg=UI_COLORS["bg_secondary"],
+            fg=UI_COLORS["fg_text"],
             font=("Arial", 9),
-            activebackground="#0a0e27",
-            activeforeground="#ff3333",
-            selectcolor="#0a0e27"
+            activebackground=UI_COLORS["bg_secondary"],
+            activeforeground=UI_COLORS["accent_red"],
+            selectcolor=UI_COLORS["bg_secondary"]
         )
         self.no_audio_processing_checkbox.grid(column=0, row=3, columnspan=2, padx=5, pady=(3, 10), sticky="w")
 

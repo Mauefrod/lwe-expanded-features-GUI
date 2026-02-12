@@ -6,7 +6,8 @@ import os
 
 from common.path_helpers import get_script_path
 from common.logger import get_logger
-from models.config import ConfigManager
+from common.constants import MAIN_SCRIPT_NAME
+from models.config import ConfigManager, ConfigUpdater
 
 
 class EngineController:
@@ -21,7 +22,7 @@ class EngineController:
     def _initialize_script_path(self):
         """Initialize and validate script path"""
         try:
-            self.script_path = get_script_path("main.sh")
+            self.script_path = get_script_path(MAIN_SCRIPT_NAME)
             self.logger.component("ENGINE", f"Script path resolved to: {self.script_path}", "DEBUG")
         except FileNotFoundError as e:
             error_msg = f"Cannot locate engine script: {str(e)}"
@@ -108,11 +109,11 @@ class EngineController:
             current_view: Current view type
         """
         if not (self.config["--random"] or self.config["--delay"]["active"]):
-            self.config["--pool"] = []
+            ConfigUpdater.set_pool(self.config, [])
             return
 
         if current_view != "wallpapers":
-            self.config["--pool"] = []
+            ConfigUpdater.set_pool(self.config, [])
             return
 
-        self.config["--pool"] = item_list.copy() if item_list else []
+        ConfigUpdater.set_pool(self.config, item_list.copy() if item_list else [])

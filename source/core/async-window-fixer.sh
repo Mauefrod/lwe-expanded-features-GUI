@@ -1,28 +1,28 @@
 #!/bin/bash
-# async-window-fixer.sh
-# Asynchronous window flag manipulation
-# Launches window manipulation attempts in completely non-blocking way
+# async-window-fixer.sh - Asynchronous window flag manipulation utility
+# Launches completely non-blocking window manipulation attempts in background
 
 set -euo pipefail
+
+# Source utilities
+export SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/bash_utils.sh"
 
 ENGINE_PID="${1:-}"
 
 if [[ -z "$ENGINE_PID" ]]; then
+    log_error "Missing ENGINE_PID argument"
     exit 1
 fi
 
-# Apply window flags in non-blocking way
-apply_flags() {
-    local pid=$1
-    # Timeout after 2 seconds, run in background, suppress all output
-    timeout 2 wmctrl -lx 2>/dev/null | grep -i "linux-wallpaperengine\|wallpaperengine\|steam_app_431960" | awk '{print $1}' | while read -r win; do
-        timeout 1 wmctrl -i -r "$win" -b remove,above 2>/dev/null || true &
-        timeout 1 wmctrl -i -r "$win" -b add,skip_pager 2>/dev/null || true &
-        timeout 1 wmctrl -i -r "$win" -b add,below 2>/dev/null || true &
-    done &
-}
+log_debug "Async window fixer launched for PID $ENGINE_PID"
 
-apply_flags "$ENGINE_PID" &
+# Apply background processing flags to all engine windows
+{
+    if local -a windows=(); mapfile -t windows < <(find_engine_windows); [[ ${#windows[@]} -gt 0 ]]; then
+        apply_flags_to_windows "${windows[@]}"
+    fi
+} &
 
-# Return immediately, don't wait for background jobs
+# Return immediately without waiting
 exit 0

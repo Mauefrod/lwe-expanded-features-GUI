@@ -1,17 +1,16 @@
 #!/bin/bash
-# lwe-state-manager.sh
-# Helper script to manage engine state for process tracking
-# Allows better process tracking through state files
+# lwe-state-manager.sh - Engine state management helper script
+# Tracks and manages engine state for better process tracking and recovery
 
 set -euo pipefail
 
-# Configuration
-STATE_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/linux-wallpaper-engine-features"
-ENGINE_STATE="$STATE_DIR/engine.state"
-ENGINES_RUNNING="$STATE_DIR/engines_running"
+# Source utilities
+export SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/bash_utils.sh"
 
-# Ensure state directory exists
-mkdir -p "$STATE_DIR"
+# Configuration
+ENGINE_STATE="$DATA_DIR/engine.state"
+ENGINES_RUNNING="$DATA_DIR/engines_running"
 
 # Initialize empty state if missing
 init_state() {
@@ -24,16 +23,8 @@ init_state() {
   "last_execution": null
 }
 EOF
-        echo "Initialized state file: $ENGINE_STATE"
+        log_success "Initialized state file: $ENGINE_STATE"
     fi
-}
-
-# Escape string for JSON (basic: escape backslashes and quotes)
-json_escape() {
-    local str="$1"
-    str="${str//\\/\\\\}"  # Escape backslashes first
-    str="${str//\"/\\\"}"  # Escape double quotes
-    printf '%s' "$str"
 }
 
 # Save current engine state
@@ -57,15 +48,13 @@ save_state() {
 }
 EOF
     
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] State saved: PID=$pid, Windows=${windows:-none}"
+    log_debug "State saved: PID=$pid, Windows=${windows:-none}"
 }
 
 # Get last engine PID
 get_last_pid() {
     init_state
-    
-    # Simple grep to extract PID (works without jq)
-    grep -o '"last_pid": [0-9]*' "$ENGINE_STATE" | grep -o '[0-9]*' || echo ""
+    json_get_value "$ENGINE_STATE" "last_pid" || echo ""
 }
 
 # Get last engine windows
@@ -80,31 +69,33 @@ get_last_windows() {
     fi
 }
 
-# Check if a process is still running
-is_running() {
+# Check if a process is still running (uses utility function)
+check_running() {
     local pid="$1"
-    if [[ -z "$pid" ]]; then
-        return 1
+    
+    if is_process_running "$pid"; then
+        echo "yes"
+    else
+        echo "no"
     fi
-    kill -0 "$pid" 2>/dev/null || return 1
 }
 
-# Kill engine by PID (with fallback to process name)
+# Kill engine by PID with fallback
 kill_engine() {
     local pid="${1:-}"
     
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Killing engine (PID: ${pid:-unknown})"
+    log_debug "Killing engine (PID: ${pid:-unknown})"
     
-    if [[ -n "$pid" ]] && is_running "$pid"; then
-        kill -9 "$pid" 2>/dev/null || true
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Killed PID $pid"
+    if [[ -n "$pid" ]] && is_process_running "$pid"; then
+        kill_process "$pid"
     fi
     
-    # Fallback: kill by process name
-    pkill -9 -f linux-wallpaperengine 2>/dev/null || true
+    # Fallback: kill by pattern
+    kill_by_pattern "linux-wallpaperengine" "KILL"
     
     # Clear state
     save_state "null" "" ""
+    log_success "Engine killed and state cleared"
 }
 
 # Monitor and track engines
@@ -115,7 +106,7 @@ track_engine() {
     # Save state
     save_state "$pid" "" "$wallpaper"
     
-    # Optionally add to running engines list
+    # Add to running engines list
     echo "$pid:$wallpaper:$(date +%s)" >> "$ENGINES_RUNNING"
     
     # Cleanup old entries (keep only last 100)
@@ -123,9 +114,11 @@ track_engine() {
         tail -100 "$ENGINES_RUNNING" > "$ENGINES_RUNNING.tmp"
         mv "$ENGINES_RUNNING.tmp" "$ENGINES_RUNNING"
     fi
+    
+    log_debug "Tracked engine: PID=$pid, Wallpaper=$wallpaper"
 }
 
-# Print state info (for debugging)
+# Print state info for debugging
 show_state() {
     echo "=== LWE Engine State ==="
     echo "State File: $ENGINE_STATE"
@@ -142,23 +135,14 @@ show_state() {
     
     if [[ -f "$ENGINES_RUNNING" ]]; then
         echo ""
-        echo "Recent Engines:"
+        echo "Recent Engines (last 10):"
         tail -10 "$ENGINES_RUNNING"
     fi
 }
 
 # Cleanup old state files
 cleanup() {
-    local max_age=604800  # 7 days in seconds
-    local now=$(date +%s)
-    
-    if [[ -f "$ENGINE_STATE" ]]; then
-        local file_age=$((now - $(stat -f%m "$ENGINE_STATE" 2>/dev/null || stat -c%Y "$ENGINE_STATE" 2>/dev/null || echo 0)))
-        if [[ $file_age -gt $max_age ]]; then
-            rm -f "$ENGINE_STATE"
-            echo "Cleaned up old state file"
-        fi
-    fi
+    cleanup_old_logs 7
     
     if [[ -f "$ENGINES_RUNNING" ]]; then
         # Keep only last 50 entries
@@ -166,6 +150,7 @@ cleanup() {
             tail -50 "$ENGINES_RUNNING" > "$ENGINES_RUNNING.tmp"
             mv "$ENGINES_RUNNING.tmp" "$ENGINES_RUNNING"
         fi
+        log_debug "Cleaned up engines_running file"
     fi
 }
 
@@ -184,7 +169,7 @@ case "${1:-help}" in
         get_last_windows
         ;;
     is-running)
-        is_running "$2" && echo "yes" || echo "no"
+        check_running "$2"
         ;;
     kill)
         kill_engine "${2:-}"
@@ -198,7 +183,11 @@ case "${1:-help}" in
     cleanup)
         cleanup
         ;;
-    help|*)
+    *)
+        echo "Usage: lwe-state-manager.sh {init|save|get-pid|get-windows|is-running|kill|track|show|cleanup}"
+        exit 1
+        ;;
+esac    help|*)
         cat <<EOF
 LWE State Manager - Manage linux-wallpaperengine state
 

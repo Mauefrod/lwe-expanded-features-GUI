@@ -1,6 +1,7 @@
 """Keybinding service for executing keybinded actions via traditional Linux keyboard handling"""
 
 from models.keybindings import KeybindingManager, KeybindingAction
+from models.config import ConfigUpdater
 from typing import Callable, Dict, Optional, List
 import threading
 
@@ -24,17 +25,9 @@ class KeybindingService:
         self.config = config
         self.log = log_callback or (lambda msg: None)
 
-
-
-
-        if "--keybindings" in config:
-            keybinding_data = config.get("--keybindings", {})
-            self.keybinding_manager = KeybindingManager.from_dict(keybinding_data)
-        else:
-
-            manager = KeybindingManager()
-            manager.bindings = []
-            self.keybinding_manager = manager
+        # Load keybindings from config or initialize empty manager
+        keybinding_data = config.get("--keybindings", {"bindings": []})
+        self.keybinding_manager = KeybindingManager.from_dict(keybinding_data)
 
 
         self.action_handlers: Dict[KeybindingAction, Callable] = {}
@@ -97,7 +90,7 @@ class KeybindingService:
 
     def save_keybindings(self) -> None:
         """Save current keybindings to config"""
-        self.config["--keybindings"] = self.keybinding_manager.to_dict()
+        ConfigUpdater.set_keybindings(self.config, self.keybinding_manager.to_dict())
         self.log("[KEYBIND] Keybindings saved to config")
 
     def reset_to_defaults(self) -> None:

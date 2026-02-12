@@ -1,18 +1,19 @@
 from tkinter import Frame, Entry, Button, Label, BooleanVar, Checkbutton, Text, Canvas, ttk
+from common.constants import UI_COLORS, DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT
 
 
 class LogArea:
     """Manages the application log display area with colored text output"""
 
     def __init__(self, parent):
-        self.frame = Frame(parent, bg="#0a0e27", bd=2, relief="solid", highlightthickness=2, highlightcolor="#004466", highlightbackground="#004466")
+        self.frame = Frame(parent, bg=UI_COLORS["bg_secondary"], bd=2, relief="solid", highlightthickness=2, highlightcolor=UI_COLORS["accent_blue"], highlightbackground=UI_COLORS["accent_blue"])
 
         self.text_widget = Text(
             self.frame,
             height=12,
-            bg="#0f1729",
-            fg="#00ff00",
-            insertbackground="#00d4ff",
+            bg=UI_COLORS["bg_tertiary"],
+            fg=UI_COLORS["accent_green_success"],
+            insertbackground=UI_COLORS["accent_cyan"],
             wrap="word",
             bd=0,
             font=("Courier", 9)
@@ -21,8 +22,12 @@ class LogArea:
 
     def log(self, message):
         """Add a message to the log display"""
-        self.text_widget.insert("end", message + "\n")
-        self.text_widget.see("end")
+        try:
+            self.text_widget.insert("end", message + "\n")
+            self.text_widget.see("end")
+            self.text_widget.update_idletasks()
+        except Exception as e:
+            print(f"[LOG_ERROR] Error writing to log: {str(e)}")
 
     def clear(self):
         """Limpia el log"""
@@ -160,7 +165,7 @@ class GalleryCanvas:
         self.container = Frame(parent)
 
 
-        self.canvas = Canvas(self.container, width=800, height=600, bg="#222")
+        self.canvas = Canvas(self.container, width=DEFAULT_WINDOW_WIDTH, height=DEFAULT_WINDOW_HEIGHT, bg=UI_COLORS["bg_canvas"])
         self.canvas.pack(side="left", fill="both", expand=True)
 
 
@@ -174,7 +179,7 @@ class GalleryCanvas:
         self.canvas.configure(yscrollcommand=self.scrollbar.set)
 
 
-        self.inner_frame = Frame(self.canvas, bg="#222")
+        self.inner_frame = Frame(self.canvas, bg=UI_COLORS["bg_canvas"])
         self.canvas.create_window((0, 0), window=self.inner_frame, anchor="nw")
 
     def update_scroll_region(self, event=None):

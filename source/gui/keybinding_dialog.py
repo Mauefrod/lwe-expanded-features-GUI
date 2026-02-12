@@ -10,6 +10,7 @@ this is just dumbfoolery from the interpreter, you can either:
 from tkinter import Tk, Frame, Label, Button, Listbox, ttk, messagebox, Toplevel, DISABLED, NORMAL
 from models.keybindings import KeybindingAction, KeyModifier, Keybinding
 from models.config import ConfigManager
+from common.constants import UI_COLORS, DEFAULT_WINDOW_HEIGHT
 from typing import Callable
 
 
@@ -42,8 +43,8 @@ class KeybindingEditorDialog:
 
         self.dialog = Toplevel(self.parent_window)
         self.dialog.title("Configure Keybindings")
-        self.dialog.geometry("700x600")
-        self.dialog.config(bg="#1F0120")
+        self.dialog.geometry(f"700x{DEFAULT_WINDOW_HEIGHT}")
+        self.dialog.config(bg=UI_COLORS["bg_primary"])
         self.dialog.resizable(True, True)
 
 
@@ -55,24 +56,24 @@ class KeybindingEditorDialog:
             self.dialog,
             text="Configure Application Keybindings",
             font=("Arial", 14, "bold"),
-            bg="#1F0120",
-            fg="#FFFFFF"
+            bg=UI_COLORS["bg_primary"],
+            fg=UI_COLORS["fg_text"]
         )
         title.pack(pady=10)
 
 
-        main_frame = Frame(self.dialog, bg="#1F0120")
+        main_frame = Frame(self.dialog, bg=UI_COLORS["bg_primary"])
         main_frame.pack(fill="both", expand=True, padx=10, pady=10)
 
 
-        left_frame = Frame(main_frame, bg="#1F0120")
+        left_frame = Frame(main_frame, bg=UI_COLORS["bg_primary"])
         left_frame.pack(side="left", fill="both", expand=True, padx=(0, 5))
 
-        Label(left_frame, text="Click an Action:", bg="#1F0120", fg="#FFFFFF",
+        Label(left_frame, text="Click an Action:", bg=UI_COLORS["bg_primary"], fg=UI_COLORS["fg_text"],
               font=("Arial", 10, "bold")).pack(anchor="w", pady=(0, 5))
 
 
-        action_list_frame = Frame(left_frame, bg="#0a0e27", relief="sunken", borderwidth=1)
+        action_list_frame = Frame(left_frame, bg=UI_COLORS["bg_secondary"], relief="sunken", borderwidth=1)
         action_list_frame.pack(fill="both", expand=True, pady=(0, 10))
 
         scrollbar_left = ttk.Scrollbar(action_list_frame)
@@ -96,18 +97,18 @@ class KeybindingEditorDialog:
         self.action_listbox.bind("<<ListboxSelect>>", self._on_action_selected)
 
 
-        right_frame = Frame(main_frame, bg="#1F0120")
+        right_frame = Frame(main_frame, bg=UI_COLORS["bg_primary"])
         right_frame.pack(side="right", fill="both", expand=True, padx=(5, 0))
 
-        Label(right_frame, text="Bind Key:", bg="#1F0120", fg="#FFFFFF",
+        Label(right_frame, text="Bind Key:", bg=UI_COLORS["bg_primary"], fg=UI_COLORS["fg_text"],
               font=("Arial", 10, "bold")).pack(anchor="w", pady=(0, 5))
 
 
         self.status_label = Label(
             right_frame,
             text="Select an action and press keys",
-            bg="#0a0e27",
-            fg="#FFAA00",
+            bg=UI_COLORS["bg_secondary"],
+            fg=UI_COLORS["accent_orange"],
             font=("Arial", 9),
             wraplength=200,
             justify="left",
@@ -121,18 +122,18 @@ class KeybindingEditorDialog:
             right_frame,
             text="Press Key Combination\n(Ctrl, Alt, Shift, then any key)",
             command=self._start_binding,
-            bg="#004466",
-            fg="#FFFFFF",
+            bg=UI_COLORS["accent_blue"],
+            fg=UI_COLORS["fg_text"],
             height=3,
             font=("Arial", 10)
         )
         self.binding_button.pack(fill="x", pady=(0, 10))
 
 
-        Label(right_frame, text="Current Bindings:", bg="#1F0120", fg="#FFFFFF",
+        Label(right_frame, text="Current Bindings:", bg=UI_COLORS["bg_primary"], fg=UI_COLORS["fg_text"],
               font=("Arial", 10, "bold")).pack(anchor="w", pady=(10, 5))
 
-        bindings_frame = Frame(right_frame, bg="#0a0e27", relief="sunken", borderwidth=1)
+        bindings_frame = Frame(right_frame, bg=UI_COLORS["bg_secondary"], relief="sunken", borderwidth=1)
         bindings_frame.pack(fill="both", expand=True, pady=(0, 10))
 
         scrollbar2 = ttk.Scrollbar(bindings_frame)
@@ -161,22 +162,22 @@ class KeybindingEditorDialog:
             right_frame,
             text="Delete Selected Binding",
             command=self._delete_binding,
-            bg="#661111",
-            fg="#FFFFFF",
+            bg=UI_COLORS["danger_dark"],
+            fg=UI_COLORS["fg_text"],
             padx=5
         )
         delete_button.pack(fill="x", pady=(0, 10))
 
 
-        button_frame = Frame(self.dialog, bg="#1F0120")
+        button_frame = Frame(self.dialog, bg=UI_COLORS["bg_primary"])
         button_frame.pack(pady=10, fill="x", padx=10)
 
         save_button = Button(
             button_frame,
             text="Save & Close",
             command=self._on_save,
-            bg="#004466",
-            fg="#FFFFFF",
+            bg=UI_COLORS["accent_blue"],
+            fg=UI_COLORS["fg_text"],
             padx=15
         )
         save_button.pack(side="left", padx=5)
@@ -185,8 +186,8 @@ class KeybindingEditorDialog:
             button_frame,
             text="Cancel",
             command=self.dialog.destroy,
-            bg="#444444",
-            fg="#FFFFFF",
+            bg=UI_COLORS["button_cancel"],
+            fg=UI_COLORS["fg_text"],
             padx=15
         )
         close_button.pack(side="left", padx=5)
@@ -211,11 +212,11 @@ class KeybindingEditorDialog:
 
         self.status_label.config(
             text=f"Selected: {self.currently_binding}\n\nClick 'Press Key Combination'\nto bind this action",
-            fg="#FFAA00"
+            fg=UI_COLORS["accent_orange"]
         )
 
 
-        self.binding_button.config(state=NORMAL, bg="#FFA500")
+        self.binding_button.config(state=NORMAL, bg=UI_COLORS["accent_orange_bright"])
 
     def _start_binding(self):
         """Start capturing key presses for binding"""
@@ -224,10 +225,10 @@ class KeybindingEditorDialog:
             return
         self.current_modifiers = set()
 
-        self.binding_button.config(state=DISABLED, bg="#003344")
+        self.binding_button.config(state=DISABLED, bg=UI_COLORS["button_disabled"])
         self.status_label.config(
             text=f"Binding: {self.currently_binding}\n\nPress Ctrl, Alt, Shift\n(hold them), then press any key",
-            fg="#00FF00"
+            fg=UI_COLORS["accent_green_success"]
         )
         self.binding_button.focus_set()
 
@@ -288,8 +289,8 @@ class KeybindingEditorDialog:
 
             self.currently_binding = None
             self.current_modifiers = set()
-            self.binding_button.config(state=NORMAL, bg="#004466")
-            self.status_label.config(text="Select an action and press keys", fg="#FFAA00")
+            self.binding_button.config(state=NORMAL, bg=UI_COLORS["accent_blue"])
+            self.status_label.config(text="Select an action and press keys", fg=UI_COLORS["accent_orange"])
 
     def _refresh_bindings_display(self):
         """Refresh the display of current bindings"""

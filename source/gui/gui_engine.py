@@ -7,14 +7,13 @@ creating the UI components, connecting the callbacks, etc."""
 
 from tkinter import Tk
 from os import path
-from typing import Optional, Callable, Dict, Any, List
-
 from gui.config import load_config, merge_config, DEFAULT_CONFIG, save_config
-from gui.wallpaper_loader import WallpaperLoader, THUMB_SIZE
+from gui.wallpaper_loader import WallpaperLoader
 from gui.engine_controller import EngineController
 from gui.gallery_view.gallery_view import GalleryView
 from gui.groups import delete_not_working_wallpapers, set_log_callback
-
+from models.groups import GroupManager
+from common.constants import UI_COLORS, DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT, THUMB_SIZE, STANDARD_COLS
 
 from gui.ui_components.log_area import LogArea
 from gui.ui_components.directory_controls import DirectoryControls
@@ -33,7 +32,7 @@ class WallpaperEngineGUI:
 
         self.main_window = Tk()
         self.main_window.title("Linux Wallpaper Engine GUI")
-        self.main_window.config(bg="#1F0120")
+        self.main_window.config(bg=UI_COLORS["bg_primary"])
 
         self.main_window.update_idletasks()
         sw = self.main_window.winfo_screenwidth()
@@ -41,16 +40,17 @@ class WallpaperEngineGUI:
 
         geom_w = sw
         geom_h = sh
-        self.main_window.geometry(f"{geom_w}x{geom_h}+0+0")
-        self.main_window.minsize(800, 600)
+        self.main_window.geometry(f"{geom_w}x{geom_h}+0+0") # 0 + 0 are additional modifiers for weird multi monitor
+        self.main_window.minsize(DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT)
         self.main_window.resizable(True, True)
 
-        self.main_window.rowconfigure(1, weight=1)
+        self.main_window.rowconfigure(0, weight=0)  # Directory controls row
+        self.main_window.rowconfigure(1, weight=1)  # Gallery canvas row (expandable)
+        self.main_window.rowconfigure(2, weight=0, minsize=0)  # Empty spacer row
+        self.main_window.rowconfigure(3, weight=0)  # Log area row
 
-        self.main_window.rowconfigure(3, weight=0)
-
-        self.main_window.columnconfigure(0, weight=1)
-        self.main_window.columnconfigure(1, weight=0)
+        self.main_window.columnconfigure(0, weight=1)  # Main content column
+        self.main_window.columnconfigure(1, weight=0)  # Right panel column
 
 
         self._load_config()
@@ -109,32 +109,30 @@ class WallpaperEngineGUI:
     def _create_ui(self) -> None:
         """Create all UI components except log_area which is created first"""
 
-
-
-
         self.directory_controls = DirectoryControls(self.main_window)
-        self.directory_controls.grid(column=0, row=0, sticky="nsew")
-
+        self.directory_controls.grid(column=0, row=0, sticky="ew", padx=5, pady=5)
 
         self.flags_panel = FlagsPanel(self.main_window)
-        self.flags_panel.grid(column=1, row=0, sticky="nsew")
-
+        self.flags_panel.grid(column=1, row=0, sticky="ew", padx=(5, 5), pady=(5, 0))
 
         self.sound_panel = SoundPanel(self.main_window)
-        self.sound_panel.grid(column=1, row=1, sticky="nsew", padx=(5, 0), pady=(5, 0))
-
+        self.sound_panel.grid(column=1, row=1, sticky="ew", padx=(5, 5), pady=(0, 0))
 
         self.gallery_canvas = GalleryCanvas(self.main_window)
         self.gallery_canvas.grid(column=0, row=1, columnspan=1, sticky="nsew")
 
     def _create_gallery_view(self) -> None:
         """Initialize the gallery view for displaying wallpapers and groups"""
+        # Create group manager instance to be shared
+        self.group_manager = GroupManager(DEFAULT_CONFIG)
+        
         self.gallery_view = GalleryView(
             self.gallery_canvas.canvas,
             self.gallery_canvas.inner_frame,
             DEFAULT_CONFIG,
             self.loader,
-            self._log
+            self._log,
+            self.group_manager
         )
 
     def _create_managers(self) -> None:
@@ -154,7 +152,8 @@ class WallpaperEngineGUI:
         self.event_handlers = EventHandlers(
             DEFAULT_CONFIG,
             ui_components,
-            self._log
+            self._log,
+            self.group_manager
         )
 
 
@@ -295,7 +294,7 @@ class WallpaperEngineGUI:
 
             screen_width = self.main_window.winfo_screenwidth()
             col_width = THUMB_SIZE[0]
-            initial_cols = max(1, screen_width // col_width) if col_width > 0 else 6
+            initial_cols = max(1, screen_width // col_width) if col_width > 0 else STANDARD_COLS # I lied, i actually used it
             self.gallery_view.max_cols = initial_cols
         except Exception:
             pass
@@ -328,14 +327,21 @@ class WallpaperEngineGUI:
             pass
 
     def _load_backend_logs(self) -> None:
-        """Load and display backend logs if they exist"""
+        """Load and display recent backend logs if they exist (last 200 lines only)"""
         log_file = path.expanduser(
             "~/.local/share/linux-wallpaper-engine-features/logs.txt"
         )
         if path.exists(log_file):
-            with open(log_file, "r") as f:
-                for line in f:
-                    self._log("[FILE] " + line.strip())
+            try:
+                with open(log_file, "r") as f:
+                    lines = f.readlines()
+                    # Only load the last 50 lines to avoid flooding the UI
+                    recent_lines = lines[-200:] if len(lines) > 50 else lines # you could also just add a constant for this... but i like my spaghetti
+                    # if you wonder why 200, a typical execution of the app generates around 100-300 logs, if you need more... ssssshange it =)
+                    for line in recent_lines:
+                        self._log("[FILE] " + line.strip())
+            except Exception as e:
+                self._log(f"[WARNING] Error loading backend logs: {str(e)}")
 
 
 
@@ -376,7 +382,11 @@ class WallpaperEngineGUI:
     def _on_execute(self) -> None:
         """Execute wallpaper engine with current configuration"""
         self._log("[GUI] Deleting 'not working' wallpapers before execution...")
-        delete_not_working_wallpapers(DEFAULT_CONFIG)
+        try:
+            delete_not_working_wallpapers(DEFAULT_CONFIG)
+        except Exception as e:
+            self._log(f"[WARNING] Error deleting 'not working' wallpapers: {str(e)}")
+        
         self.engine.run_engine(
             self.gallery_view.item_list,
             self.gallery_view.current_view
@@ -391,13 +401,20 @@ class WallpaperEngineGUI:
     def _refresh_with_scroll_update(self) -> None:
         """Refresh gallery display and update scroll region"""
         self.gallery_manager.refresh()
+        # Multiple update calls to ensure all geometry calculations complete
+        self.gallery_canvas.container.update_idletasks()
+        self.gallery_canvas.inner_frame.update_idletasks()
         self.gallery_canvas.canvas.update_idletasks()
-        self.gallery_canvas.update_scroll_region()
+        # Schedule scroll region update after all pending tasks
+        self.gallery_canvas.canvas.after(50, self.gallery_canvas.update_scroll_region)
 
     def _on_window_close(self) -> None:
         """Handle window closing event and cleanup resources"""
         self._log("[GUI] Closing application, deleting 'not working' wallpapers...")
-        delete_not_working_wallpapers(DEFAULT_CONFIG)
+        try:
+            delete_not_working_wallpapers(DEFAULT_CONFIG)
+        except Exception as e:
+            self._log(f"[WARNING] Error deleting 'not working' wallpapers during shutdown: {str(e)}")
         self._log("[GUI] Cleanup complete, exiting.")
         self.main_window.destroy()
 

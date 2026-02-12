@@ -27,7 +27,7 @@ The KeyboardShortcutAPI provides a cleaner, more explicit interface.
 from tkinter import Tk, messagebox
 from models.keybindings import KeybindingAction
 from services.keybinding_service import KeybindingService
-from models.config import ConfigManager
+from models.config import ConfigManager, ConfigUpdater
 from typing import Callable, Dict # OMG my mate used types, what a time to be alive
 
 
@@ -187,16 +187,27 @@ class KeybindingController:
         self.engine_controller.stop_engine()
         self.log("[KEYBIND ACTION] Engine stopped")
 
-    def _action_set_wallpaper(self) -> None:
-        """Set a specific wallpaper by opening file picker"""
-        self.log("[KEYBIND] Executing: Set wallpaper")
-
+    def _ensure_directory_selected(self) -> bool:
+        """
+        Ensure a directory is selected, show warning if not.
+        
+        Returns:
+            bool: True if directory is set, False otherwise
+        """
         if not self.config.get("--dir"):
             self.log("[KEYBIND ACTION] No directory selected")
             messagebox.showwarning(
                 "No Directory",
                 "Please select a wallpaper directory first"
             )
+            return False
+        return True
+
+    def _action_set_wallpaper(self) -> None:
+        """Set a specific wallpaper by opening file picker"""
+        self.log("[KEYBIND] Executing: Set wallpaper")
+
+        if not self._ensure_directory_selected():
             return
 
         wallpapers = self.gallery_view._load_wallpapers_from_directory(
@@ -207,29 +218,20 @@ class KeybindingController:
             messagebox.showinfo("No Wallpapers", "No wallpapers found in directory")
             return
 
-
-
-        if wallpapers:
-            selected = wallpapers[0]
-            self.log(f"[KEYBIND ACTION] Setting wallpaper: {selected.id}")
-            self.engine_controller.apply_wallpaper(
-                selected.id,
-                wallpapers,
-                "all"
-            )
+        selected = wallpapers[0]
+        self.log(f"[KEYBIND ACTION] Setting wallpaper: {selected.id}")
+        self.engine_controller.apply_wallpaper(
+            selected.id,
+            wallpapers,
+            "all"
+        )
 
     def _action_select_random(self) -> None:
         """Select a random wallpaper from the current set"""
         self.log("[KEYBIND] Executing: Select random wallpaper")
 
-        if not self.config.get("--dir"):
-            self.log("[KEYBIND ACTION] No directory selected")
-            messagebox.showwarning(
-                "No Directory",
-                "Please select a wallpaper directory first"
-            )
+        if not self._ensure_directory_selected():
             return
-
 
         try:
             wallpapers = self.gallery_view._load_wallpapers_from_directory(
@@ -253,101 +255,81 @@ class KeybindingController:
             self.log(f"[KEYBIND ACTION ERROR] {str(e)}")
             messagebox.showerror("Error", f"Failed to select random wallpaper: {str(e)}")
 
+    def _toggle_config_flag(self, config_path: tuple, ui_attr: str = None, mode_name: str = "mode") -> None:
+        """
+        Generic helper to toggle a config flag and update UI.
+        
+        Args:
+            config_path: Tuple describing path to value (e.g., ("--random",) or ("--window", "active"))
+            ui_attr: Optional ui attribute to update (e.g., 'random_mode')
+            mode_name: Display name for logging
+        """
+        if len(config_path) == 1:
+            current_state = self.config.get(config_path[0], False)
+            key = config_path[0]
+        else:
+            parent = self.config.get(config_path[0], {})
+            key = config_path[1]
+            current_state = parent.get(key, False)
+
+        new_state = not current_state
+
+        if new_state:
+            self.log(f"[KEYBIND ACTION] {mode_name}: ON")
+        else:
+            self.log(f"[KEYBIND ACTION] {mode_name}: OFF")
+
+        if ui_attr:
+            try:
+                flags_panel = self.event_handlers.ui.get('flags_panel')
+                if flags_panel and hasattr(flags_panel, ui_attr):
+                    getattr(flags_panel, ui_attr).set(new_state)
+            except:
+                pass
+
+        # Use appropriate ConfigUpdater method based on flag type
+        if config_path == ("--random",):
+            ConfigUpdater.set_random_mode(self.config, new_state)
+        elif config_path == ("--delay", "active"):
+            ConfigUpdater.set_delay_mode(self.config, new_state)
+        elif config_path == ("--window", "active"):
+            ConfigUpdater.set_window_mode(self.config, new_state)
+        elif config_path == ("--above",):
+            ConfigUpdater.set_above_flag(self.config, new_state)
+
     def _action_toggle_random_mode(self) -> None:
         """Toggle random mode on/off"""
         self.log("[KEYBIND] Executing: Toggle random mode")
-
-        current_state = self.config.get("--random", False)
-        new_state = not current_state
-
-        self.config["--random"] = new_state
-
-        if new_state:
+        
+        # When enabling random mode, disable other exclusive modes
+        if not self.config.get("--random", False):
+            # Use ConfigUpdater to properly disable exclusive modes
             self.config["--delay"]["active"] = False
             self.config["--set"]["active"] = False
-            self.log("[KEYBIND ACTION] Random mode: ON")
-        else:
-            self.log("[KEYBIND ACTION] Random mode: OFF")
-
-
-        try:
-            if hasattr(self.event_handlers.ui.get('flags_panel'), 'random_mode'):
-                self.event_handlers.ui['flags_panel'].random_mode.set(new_state)
-        except:
-            pass
-
-        ConfigManager.save(self.config)
+        
+        self._toggle_config_flag(("--random",), "random_mode", "Random mode")
 
     def _action_toggle_delay_mode(self) -> None:
         """Toggle delay mode on/off"""
         self.log("[KEYBIND] Executing: Toggle delay mode")
-
-        current_state = self.config.get("--delay", {}).get("active", False)
-        new_state = not current_state
-
-        self.config["--delay"]["active"] = new_state
-
-        if new_state:
+        
+        # When enabling delay mode, disable other exclusive modes
+        if not self.config.get("--delay", {}).get("active", False):
+            # Use ConfigUpdater to properly disable exclusive modes
             self.config["--random"] = False
             self.config["--set"]["active"] = False
-            self.log("[KEYBIND ACTION] Delay mode: ON")
-        else:
-            self.log("[KEYBIND ACTION] Delay mode: OFF")
-
-
-        try:
-            if hasattr(self.event_handlers.ui.get('flags_panel'), 'delay_mode'):
-                self.event_handlers.ui['flags_panel'].delay_mode.set(new_state)
-        except:
-            pass
-
-        ConfigManager.save(self.config)
+        
+        self._toggle_config_flag(("--delay", "active"), "delay_mode", "Delay mode")
 
     def _action_toggle_window_mode(self) -> None:
         """Toggle window mode on/off"""
         self.log("[KEYBIND] Executing: Toggle window mode")
-
-        current_state = self.config.get("--window", {}).get("active", False)
-        new_state = not current_state
-
-        self.config["--window"]["active"] = new_state
-
-        if new_state:
-            self.log("[KEYBIND ACTION] Window mode: ON")
-        else:
-            self.log("[KEYBIND ACTION] Window mode: OFF")
-
-
-        try:
-            if hasattr(self.event_handlers.ui.get('flags_panel'), 'window_mode'):
-                self.event_handlers.ui['flags_panel'].window_mode.set(new_state)
-        except:
-            pass
-
-        ConfigManager.save(self.config)
+        self._toggle_config_flag(("--window", "active"), "window_mode", "Window mode")
 
     def _action_toggle_above(self) -> None:
         """Toggle --above flag"""
         self.log("[KEYBIND] Executing: Toggle --above flag")
-
-        current_state = self.config.get("--above", False)
-        new_state = not current_state
-
-        self.config["--above"] = new_state
-
-        if new_state:
-            self.log("[KEYBIND ACTION] Always above: ON")
-        else:
-            self.log("[KEYBIND ACTION] Always above: OFF")
-
-
-        try:
-            if hasattr(self.event_handlers.ui.get('flags_panel'), 'above_flag'):
-                self.event_handlers.ui['flags_panel'].above_flag.set(new_state)
-        except:
-            pass
-
-        ConfigManager.save(self.config)
+        self._toggle_config_flag(("--above",), "above_flag", "Always above")
 
     def _action_next_wallpaper(self) -> None:
         """Navigate to next wallpaper in gallery"""

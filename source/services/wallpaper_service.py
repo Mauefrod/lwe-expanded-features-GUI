@@ -110,7 +110,7 @@ class WallpaperFinder:
         Args:
             root_dir: Root wallpaper directory
             loader: WallpaperLoader instance
-            group: Optional group name filter
+            group: Optional group name filter (__ALL__, __FAVORITES__, or custom group name)
             favorites: Optional favorites list
             groups_dict: Optional groups dictionary
         
@@ -131,8 +131,16 @@ class WallpaperFinder:
                 if not loader.load_preview(folder):
                     continue
 
-
-                if group and groups_dict:
+                # Handle special groups and favorites
+                if group == "__FAVORITES__":
+                    # Show only favorites
+                    if favorites is None or w not in favorites:
+                        continue
+                elif group == "__ALL__":
+                    # Show all wallpapers (no filtering)
+                    pass
+                elif group and groups_dict:
+                    # Show only wallpapers in the specified custom group
                     if not WallpaperFinder._is_in_group(w, group, groups_dict):
                         continue
 

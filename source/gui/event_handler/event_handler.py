@@ -1,17 +1,20 @@
 from tkinter import filedialog, messagebox, Toplevel, Label, Frame, Button, ttk
 from subprocess import Popen, DEVNULL
-from os import path
 import os
-from gui.config import update_set_flag, save_config
+from models.config import ConfigUpdater
+from models.groups import GroupManager
+from common.constants import MAIN_SCRIPT_NAME, STEAM_WALLPAPER_ENGINE_APP_ID
 
 
 class EventHandlers:
     """Centralizes all application event handlers for user interactions"""
 
-    def __init__(self, config, ui_components, log_callback):
+    def __init__(self, config, ui_components, log_callback, group_manager=None):
         self.config = config
         self.ui = ui_components
         self.log = log_callback
+        # Use injected group manager or create one
+        self.group_manager = group_manager or GroupManager(config)
 
 
 
@@ -21,10 +24,32 @@ class EventHandlers:
         if route:
             self.log(f"[HANDLER] Directory selected: {route}")
             self.ui['directory_controls'].set_directory(route)
-            self.config["--dir"] = route
-            save_config(self.config)
+            ConfigUpdater.set_directory(self.config, route)
             if self.ui.get('on_refresh_gallery'):
                 self.ui['on_refresh_gallery']()
+
+    def _open_file_manager(self, dir_path: str) -> bool:
+        """
+        Open directory in file manager using available tools.
+        
+        Args:
+            dir_path: Path to open
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        file_managers = ["xdg-open", "thunar", "nautilus"]
+        
+        for manager in file_managers:
+            try:
+                Popen([manager, dir_path])
+                self.log(f"[HANDLER] Opened directory with {manager}")
+                return True
+            except FileNotFoundError:
+                continue
+        
+        self.log("[ERROR] Could not open file manager - none available")
+        return False
 
     def on_explore_directory(self) -> None:
         """Open directory in file manager explorer"""
@@ -47,22 +72,11 @@ class EventHandlers:
                 return
 
             self.log(f"[HANDLER] Opening directory explorer for: {dir_path}")
-            try:
-                Popen(["xdg-open", dir_path])
-            except FileNotFoundError:
-                self.log("[WARNING] xdg-open not found, trying alternatives")
-
-                try:
-                    Popen(["thunar", dir_path])
-                except:
-                    try:
-                        Popen(["nautilus", dir_path])
-                    except:
-                        self.log("[ERROR] Could not open file manager")
-                        messagebox.showerror(
-                            title="File manager not found",
-                            message="Could not open file manager. Please open manually:\n" + dir_path
-                        )
+            if not self._open_file_manager(dir_path):
+                messagebox.showerror(
+                    title="File manager not found",
+                    message="Could not open file manager. Please open manually:\n" + dir_path
+                )
         except Exception as e:
             self.log(f"[ERROR] Error opening directory: {str(e)}")
             messagebox.showerror(
@@ -77,17 +91,18 @@ class EventHandlers:
         flags = self.ui['flags_panel']
         if flags.window_mode.get():
             self.log("[HANDLER] Window mode enabled")
-            self.config["--window"]["active"] = True
+            ConfigUpdater.set_window_mode(self.config, True)
             self.show_resolution_picker()
         else:
             self.log("[HANDLER] Window mode disabled")
-            self.config["--window"]["active"] = False
+            ConfigUpdater.set_window_mode(self.config, False)
 
     def on_above_flag_changed(self) -> None:
         """Handle always-on-top flag toggle change"""
         flags = self.ui['flags_panel']
-        self.config["--above"] = flags.above_flag.get()
-        self.log(f"[HANDLER] Above flag changed to: {self.config['--above']}")
+        above_value = flags.above_flag.get()
+        ConfigUpdater.set_above_flag(self.config, above_value)
+        self.log(f"[HANDLER] Above flag changed to: {above_value}")
 
     def on_random_mode_changed(self) -> None:
         """Handle random mode toggle change"""
@@ -96,76 +111,61 @@ class EventHandlers:
         if flags.random_mode.get():
             self.log("[HANDLER] Random mode enabled")
 
-            if not self.config["--dir"] or not self.config["--dir"].rstrip("/").endswith("431960"):
+            if not self.config["--dir"] or not self.config["--dir"].rstrip("/").endswith(STEAM_WALLPAPER_ENGINE_APP_ID):
                 self.log("[HANDLER] Invalid directory for random mode")
                 messagebox.showwarning(
                     title="Wrong Directory",
-                    message="In order for the random mode to work properly, make sure to select the 431960 folder as your root dir!!"
+                    message=f"In order for the random mode to work properly, make sure to select the {STEAM_WALLPAPER_ENGINE_APP_ID} folder as your root dir!!"
                 )
 
 
             flags.add_timer_controls(self.on_timer_submit)
         else:
             self.log("[HANDLER] Random mode disabled")
-            self.config["--random"] = False
-            self.config["--delay"]["active"] = False
-            self.config["--delay"]["timer"] = "0"
+            ConfigUpdater.set_random_mode(self.config, False)
             flags.clear_dynamic_widgets()
-            save_config(self.config)
-
-        update_set_flag(self.config)
 
     def on_timer_submit(self, timer_value: str) -> None:
         """Handle timer submission for delay mode"""
         if timer_value != "0":
             self.log(f"[HANDLER] Delay mode set to {timer_value} seconds")
-            self.config["--delay"]["active"] = True
-            self.config["--delay"]["timer"] = timer_value
-            self.config["--random"] = False
+            ConfigUpdater.set_delay_mode(self.config, True, timer_value)
         else:
             self.log("[HANDLER] Random mode (no delay)")
-            self.config["--delay"]["active"] = False
-            self.config["--delay"]["timer"] = "0"
-            self.config["--random"] = True
+            ConfigUpdater.set_random_mode(self.config, True)
 
-        update_set_flag(self.config)
-        save_config(self.config)
         self.ui['flags_panel'].clear_dynamic_widgets()
 
 
 
-    def on_silent_changed(self) -> None:
-        """Handle silent mode checkbox change"""
+    def _handle_sound_setting_change(self, config_key: str, ui_attr: str, log_msg: str) -> None:
+        """
+        Generic handler for sound panel checkbox changes.
+        
+        Args:
+            config_key: Key within --sound config (e.g., 'silent')
+            ui_attr: Attribute name on sound_panel (e.g., 'silent')
+            log_msg: Description for logging
+        """
         sound_panel = self.ui['sound_panel']
-        self.config["--sound"]["silent"] = sound_panel.silent.get()
-        self.log(f"[HANDLER] Silent mode: {self.config['--sound']['silent']}")
-        save_config(self.config)
-
+        value = getattr(sound_panel, ui_attr).get()
+        ConfigUpdater.set_sound_flag(self.config, config_key, value)
+        self.log(f"[HANDLER] {log_msg}: {value}")
 
         if self.ui.get('on_execute'):
             self.ui['on_execute']()
+
+    def on_silent_changed(self) -> None:
+        """Handle silent mode checkbox change"""
+        self._handle_sound_setting_change("silent", "silent", "Silent mode")
 
     def on_noautomute_changed(self) -> None:
         """Handle no auto mute checkbox change"""
-        sound_panel = self.ui['sound_panel']
-        self.config["--sound"]["noautomute"] = sound_panel.noautomute.get()
-        self.log(f"[HANDLER] No auto mute: {self.config['--sound']['noautomute']}")
-        save_config(self.config)
-
-
-        if self.ui.get('on_execute'):
-            self.ui['on_execute']()
+        self._handle_sound_setting_change("noautomute", "noautomute", "No auto mute")
 
     def on_audio_processing_changed(self) -> None:
         """Handle No Audio Processing checkbox change"""
-        sound_panel = self.ui['sound_panel']
-        self.config["--sound"]["no_audio_processing"] = sound_panel.no_audio_processing.get()
-        self.log(f"[HANDLER] No audio processing: {self.config['--sound']['no_audio_processing']}")
-        save_config(self.config)
-
-
-        if self.ui.get('on_execute'):
-            self.ui['on_execute']()
+        self._handle_sound_setting_change("no_audio_processing", "no_audio_processing", "No audio processing")
 
 
 
@@ -192,7 +192,7 @@ class EventHandlers:
         def accept():
             selected_res = combo.get()
             window.destroy()
-            self.config["--window"]["res"] = selected_res
+            ConfigUpdater.set_window_resolution(self.config, selected_res)
 
         Button(frame, text="ACCEPT", command=accept).grid(column=0, row=1)
 
@@ -237,15 +237,14 @@ class EventHandlers:
 
 
 
-    def on_startup_changed(self):
-        """Handles the startup checkbox toggle"""
-        flags = self.ui["flags_panel"]
-        enabled = flags.startup.get()
-
-        self.log(f"[HANDLER] Startup toggle changed to: {enabled}")
-
+    def _get_systemd_manager(self):
+        """
+        Import and return systemd_manager module.
+        
+        Returns:
+            module: systemd_manager module or None if import fails
+        """
         try:
-
             import sys
             from pathlib import Path
 
@@ -257,20 +256,35 @@ class EventHandlers:
             if str(CORE_DIR) not in sys.path:
                 sys.path.insert(0, str(CORE_DIR))
 
-            from systemd_manager import enable_startup, disable_startup
+            import systemd_manager
+            return systemd_manager
+        except Exception as e:
+            self.log(f"[ERROR] Failed to import systemd_manager: {str(e)}")
+            return None
 
+    def on_startup_changed(self):
+        """Handles the startup checkbox toggle"""
+        flags = self.ui["flags_panel"]
+        enabled = flags.startup.get()
+
+        self.log(f"[HANDLER] Startup toggle changed to: {enabled}")
+
+        try:
+            systemd = self._get_systemd_manager()
+            if not systemd:
+                messagebox.showerror("Startup Configuration Error", "Could not access systemd manager")
+                flags.startup.set(not enabled)
+                return
 
             if enabled:
-                success, message = enable_startup()
+                success, message = systemd.enable_startup()
             else:
-                success, message = disable_startup()
+                success, message = systemd.disable_startup()
 
             if success:
-                self.config["__run_at_startup__"] = enabled
-                save_config(self.config)
+                ConfigUpdater.set_startup(self.config, enabled)
                 self.log(f"[HANDLER] {message}")
             else:
-
                 self.log(f"[ERROR] {message}")
                 messagebox.showerror("Startup Configuration Error", message)
                 flags.startup.set(not enabled)
@@ -283,28 +297,16 @@ class EventHandlers:
     def sync_startup_state(self):
         """Syncs config with actual systemd state on startup"""
         try:
+            systemd = self._get_systemd_manager()
+            if not systemd:
+                return False
 
-            import sys
-            from pathlib import Path
-
-            CURRENT_DIR = Path(__file__).parent.absolute()
-            GUI_DIR = CURRENT_DIR.parent
-            SOURCE_DIR = GUI_DIR.parent
-            CORE_DIR = SOURCE_DIR / "core"
-
-            if str(CORE_DIR) not in sys.path:
-                sys.path.insert(0, str(CORE_DIR))
-
-            from systemd_manager import is_service_enabled
-
-            systemd_enabled = is_service_enabled()
+            systemd_enabled = systemd.is_service_enabled()
             config_enabled = self.config.get("__run_at_startup__", False)
 
             if systemd_enabled != config_enabled:
                 self.log(f"[HANDLER] Syncing startup state: systemd={systemd_enabled}, config={config_enabled}")
-                self.config["__run_at_startup__"] = systemd_enabled
-                save_config(self.config)
-
+                ConfigUpdater.set_startup(self.config, systemd_enabled)
 
                 if 'flags_panel' in self.ui and hasattr(self.ui['flags_panel'], 'startup'):
                     self.ui['flags_panel'].startup.set(systemd_enabled)
@@ -332,10 +334,10 @@ class EventHandlers:
         from gui.path_utils import get_script_path
 
         try:
-            script_path = get_script_path("main.sh")
+            script_path = get_script_path(MAIN_SCRIPT_NAME)
         except FileNotFoundError as e:
             self.log(f"[ERROR] {str(e)}")
-            messagebox.showerror("Error", "Could not find main.sh script")
+            messagebox.showerror("Error", f"Could not find {MAIN_SCRIPT_NAME} script")
             return
 
         try:

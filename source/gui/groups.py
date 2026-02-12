@@ -8,8 +8,9 @@ from models.groups import GroupManager
 from common.logger import set_logger_callback
 
 
-
-_group_manager = None
+def _get_manager(config):
+    """Helper to create GroupManager instance"""
+    return GroupManager(config)
 
 
 def set_log_callback(callback):
@@ -19,47 +20,39 @@ def set_log_callback(callback):
 
 def toggle_favorite(config, wallpaper_id):
     """Backward compatibility wrapper"""
-    manager = GroupManager(config)
-    manager.toggle_favorite(wallpaper_id)
+    _get_manager(config).toggle_favorite(wallpaper_id)
 
 
 def is_favorite(config, wallpaper_id):
     """Backward compatibility wrapper"""
-    manager = GroupManager(config)
-    return manager.is_favorite(wallpaper_id)
+    return _get_manager(config).is_favorite(wallpaper_id)
 
 
 def create_group(config, name):
     """Backward compatibility wrapper"""
-    manager = GroupManager(config)
-    return manager.create_group(name)
+    return _get_manager(config).create_group(name)
 
 
 def add_to_group(config, group, wallpaper_id):
     """Backward compatibility wrapper"""
-    manager = GroupManager(config)
-    manager.add_to_group(group, wallpaper_id)
+    _get_manager(config).add_to_group(group, wallpaper_id)
 
 
 def remove_from_group(config, group, wallpaper_id):
     """Backward compatibility wrapper"""
-    manager = GroupManager(config)
-    manager.remove_from_group(group, wallpaper_id)
+    _get_manager(config).remove_from_group(group, wallpaper_id)
 
 
 def in_group(config, group, wallpaper_id):
     """Backward compatibility wrapper"""
-    manager = GroupManager(config)
-    return manager.in_group(group, wallpaper_id)
+    return _get_manager(config).in_group(group, wallpaper_id)
 
 
 def delete_group(config, group_id):
     """Backward compatibility wrapper"""
-    manager = GroupManager(config)
-    manager.delete_group(group_id)
+    _get_manager(config).delete_group(group_id)
 
 
 def delete_not_working_wallpapers(config):
     """Backward compatibility wrapper"""
-    manager = GroupManager(config)
-    manager.delete_not_working_wallpapers()
+    _get_manager(config).delete_not_working_wallpapers()

@@ -9,6 +9,8 @@ class GalleryManager:
         self.gallery_view = gallery_view
         self.loader = loader
         self.config = config
+        # Use the group manager from gallery_view
+        self.group_manager = gallery_view.group_manager
 
     def refresh(self) -> None:
         """Refresh complete gallery display based on current view state"""
@@ -28,7 +30,7 @@ class GalleryManager:
     def _render_groups_view(self, root_dir: str) -> None:
         """Render the groups view showing all wallpaper groups"""
 
-        groups = list(self.config["--groups"].keys())
+        groups = self.group_manager.get_all_groups()
         self.gallery_view.item_list = ["__ALL__", "__FAVORITES__"] + groups + ["__NEW_GROUP__"]
 
 
@@ -54,7 +56,7 @@ class GalleryManager:
                 )
 
             else:
-                count = len(self.config["--groups"].get(group_id, []))
+                count = len(self.group_manager.get_group_contents(group_id))
                 self.gallery_view.create_group_thumbnail(
                     index, row, col, group_id, group_id, count
                 )

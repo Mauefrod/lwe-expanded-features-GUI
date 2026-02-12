@@ -1,6 +1,10 @@
 #!/bin/bash
 set -euo pipefail
 
+# Source utilities
+export SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/bash_utils.sh"
+
 DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/linux-wallpaper-engine-features"
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/linux-wallpaper-engine-features"
 
@@ -9,25 +13,14 @@ PID_FILE="$DATA_DIR/loop.pid"
 ENGINE_STATE_FILE="$DATA_DIR/engine_state.json"
 PREV_WINDOWS_FILE="$DATA_DIR/prev_windows.txt"
 
+# Set log file for bash_utils functions
+export LOG_FILE
+
 # Ensure directories exist
 mkdir -p "$DATA_DIR" "$CONFIG_DIR"
 
-# Diagnostic function to test if wmctrl works
-test_wmctrl() {
-    if wmctrl -lx &>/dev/null; then
-        return 0
-    else
-        # More detailed diagnostics - capture actual error
-        local wmctrl_error
-        wmctrl_error=$(wmctrl -lx 2>&1 || true)
-        if [[ -n "$wmctrl_error" ]]; then
-            log "DEBUG: wmctrl error output: $wmctrl_error"
-        else
-            log "DEBUG: wmctrl returned empty output (no windows or permission denied)"
-        fi
-        return 1
-    fi
-}
+# Setup X11 and D-Bus environments
+setup_environments
 
 POOL=()
 ENGINE=""  # Will be detected at startup
@@ -38,78 +31,14 @@ COMMAND=""
 DELAY=""
 ACTIVE_WIN=""
 
-# log writes a timestamped message (YYYY-MM-DD HH:MM:SS) composed from its arguments and appends it to the file specified by LOG_FILE.
-log() {
-    local msg="[$(date '+%Y-%m-%d %H:%M:%S')] $*"
-    echo "$msg" >> "$LOG_FILE"
-}
-
 log "==================== NEW EXECUTION ===================="
 
 ###############################################
-#  ENGINE DETECTION (ROBUST)
+#  ENGINE DETECTION (uses centralized utility)
 ###############################################
-detect_engine() {
-    log "Starting engine detection..."
-   
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-
-    # Strategy 2: Check common installation locations
-    local -a common_locations=(
-    "$HOME/.local/bin/linux-wallpaperengine"
-    "/usr/local/bin/linux-wallpaperengine"
-    "/usr/bin/linux-wallpaperengine"
-    "$PROJECT_ROOT/linux-wallpaperengine/build/linux-wallpaperengine"  # ← Ahora absoluta
-    "$PROJECT_ROOT/linux-wallpaperengine/linux-wallpaperengine"
-    "$PROJECT_ROOT/linux-wallpaperengine/build/output/linux-wallpaperengine"
-)
-    # Strategy 1: Check PATH for common binary names
-    for binary in linux-wallpaperengine wallpaperengine; do
-        if command -v "$binary" >/dev/null 2>&1; then
-            ENGINE="$binary"
-            local engine_path
-            engine_path=$(command -v "$binary")
-            log "Engine binary detected in PATH: $engine_path"
-            
-            # Try to get version info
-            local version_info
-            version_info=$("$binary" --version 2>/dev/null || echo "unknown")
-            log "Engine version: $version_info"
-            return 0
-        fi
-    done
-
-    for location in "${common_locations[@]}"; do
-        if [[ -x "$location" ]]; then
-            ENGINE="$location"
-            log "Engine binary detected at: $location"
-            
-            # Expand to absolute path if relative
-            if [[ "$location" == "./"* ]]; then
-                ENGINE="$(cd "$(dirname "$location")" && pwd)/$(basename "$location")"
-                log "Resolved to absolute path: $ENGINE"
-            fi
-            
-            return 0
-        fi
-    done
-    
-    # Engine not found anywhere
-    log "ERROR: linux-wallpaperengine binary not found"
-    log "Searched locations:"
-    log "  - PATH (as linux-wallpaperengine, wallpaperengine)"
-    log "  - $HOME/.local/bin/linux-wallpaperengine"
-    log "  - /usr/local/bin/linux-wallpaperengine"
-    log "  - /usr/bin/linux-wallpaperengine"
-    log "  - ./linux-wallpaperengine/build/linux-wallpaperengine"
-    
-    return 1
-}
-
-# Detect engine at startup
-if ! detect_engine; then
-    log "CRITICAL: Cannot proceed without engine binary"
+# Detect engine at startup using centralized utility
+if ! ENGINE=$(detect_engine_binary); then
+    log_error "CRITICAL: Cannot proceed without engine binary"
     echo "ERROR: linux-wallpaperengine not found in PATH or common locations" >&2
     echo "" >&2
     echo "Please install linux-wallpaperengine first:" >&2
@@ -125,30 +54,11 @@ fi
 log "Using engine: $ENGINE"
 
 ###############################################
-#  GET ENGINE WINDOWS
+#  GET ENGINE WINDOWS (wrapper using utility)
 ###############################################
 get_engine_windows() {
-    local -a windows=()
-    
-    # Try wmctrl
-    if wmctrl -lx 2>/dev/null | grep -i "linux-wallpaperengine\|wallpaperengine\|steam_app_431960" &>/dev/null; then
-        mapfile -t windows < <(wmctrl -lx 2>/dev/null | grep -i "linux-wallpaperengine\|wallpaperengine\|steam_app_431960" | awk '{print $1}' || true)
-        if [[ ${#windows[@]} -gt 0 ]]; then
-            log "Window detection (wmctrl): Found ${#windows[@]} window(s)"
-            printf "%s\n" "${windows[@]}"
-            return 0
-        fi
-    fi
-    
-    # Strategy 2: Check stored window IDs from previous execution
-    if [[ -f "$PREV_WINDOWS_FILE" ]]; then
-        log "Window detection (fallback): Using stored window IDs"
-        cat "$PREV_WINDOWS_FILE" || true
-        return 0
-    fi
-    
-    log "Window detection: No previous windows found"
-    return 0
+    # Use centralized window detection utility
+    find_engine_windows
 }
 
 save_engine_state() {
@@ -167,57 +77,26 @@ save_engine_state() {
 
 
 ###############################################
-#  KILL ENGINE (robusto, no mata el nuevo)
+#  KILL ENGINE (wrapper using utility)
 ###############################################
 kill_previous_engine() {
     log "Killing previous engine instances"
     
-    # Kill by process name (most reliable)
-    pkill -f linux-wallpaperengine 2>/dev/null || true
-    
-    # Try to close windows if we can detect them
-    local -a old_windows
-    mapfile -t old_windows < <(get_engine_windows)
-    
-    if [[ ${#old_windows[@]} -gt 0 ]]; then
-        for win in "${old_windows[@]}"; do
-            log "Attempting to close window: $win"
-            wmctrl -i -c "$win" 2>/dev/null || true
-        done
-    fi
-    
-    # Give the process time to die
+    # Use centralized process killer with automatic signal escalation
+    # This tries SIGTERM, then SIGKILL if needed
+    kill_by_pattern "linux-wallpaperengine" 3
     sleep 0.5
 }
 
 
 ###############################################
-#  STOP TOTAL (mata loops + engine)
+#  STOP TOTAL (using utilities with signal escalation)
 ###############################################
 cmd_stop() {
     log "Stopping ALL wallpaper engine processes and loops"
 
-    # First, try to close windows gracefully (if wmctrl works)
-    local -a engine_windows=()
-    mapfile -t engine_windows < <(get_engine_windows)
-    
-    # Close windows gracefully first (skip empty/none values)
-    if [[ ${#engine_windows[@]} -gt 0 ]]; then
-        for win in "${engine_windows[@]}"; do
-            if [[ -n "$win" ]] && [[ "$win" != "none" ]]; then
-                log "Attempting to close window: $win"
-                wmctrl -i -c "$win" 2>/dev/null || true
-            fi
-        done
-    else
-        log "No windows to close (array empty)"
-    fi
-    
-    sleep 1
-
-    # Kill engine processes (aggressive approach)
-    log "Force killing engine processes"
-    pkill -9 -f linux-wallpaperengine 2>/dev/null || true
+    # Kill engine processes with signal escalation (SIGTERM → SIGKILL)
+    kill_process "linux-wallpaperengine" 1
     
     # Kill loop process if exists
     if [[ -f "$PID_FILE" ]]; then
@@ -225,28 +104,13 @@ cmd_stop() {
         loop_pid=$(cat "$PID_FILE" 2>/dev/null || echo "")
         if [[ -n "$loop_pid" ]]; then
             log "Killing loop process with PID: $loop_pid"
-            # Try TERM first, then KILL
-            kill -TERM "$loop_pid" 2>/dev/null || true
-            sleep 0.2
-            if kill -0 "$loop_pid" 2>/dev/null; then
-                log "Loop process still alive, using SIGKILL"
-                kill -9 "$loop_pid" 2>/dev/null || true
-            fi
-            sleep 0.3
-            # Verify it's dead
-            if kill -0 "$loop_pid" 2>/dev/null; then
-                log "ERROR: Loop process $loop_pid still alive after SIGKILL, this should not happen"
-                # Last resort: pkill by exact PID
-                pkill -9 -P "$loop_pid" 2>/dev/null || true
-            else
-                log "Loop process successfully killed"
-            fi
+            kill_process "$loop_pid" 2  # 2 second timeout for escalation
         fi
         rm -f "$PID_FILE"
     fi
     
-    # Final cleanup: kill any remaining main.sh instances (the loop script)
-    pkill -9 -f "bash.*main.sh" 2>/dev/null || true
+    # Final cleanup: kill any remaining main.sh instances
+    kill_by_pattern "bash.*main.sh" 1
     
     # Clear state files
     rm -f "$PREV_WINDOWS_FILE" "$ENGINE_STATE_FILE.pid" 2>/dev/null || true
@@ -256,46 +120,17 @@ cmd_stop() {
 
 
 ###############################################
-#  WAIT FOR WINDOW
-# wait_for_window waits for a new engine-related window that is not in the provided exclusion list and echoes its window ID.
-# It accepts zero or more window IDs to ignore (exclude_windows). Searches wmctrl for windows matching
-# "linux-wallpaperengine", "wallpaperengine", or "steam_app_431960" and returns the first ID not in the exclusions.
+#  WAIT FOR WINDOW (wrapper using utility)
+###############################################
 wait_for_window() {
-    local -a exclude_windows=("$@")
-    local win=""
-    
-    for i in {1..200}; do
-        local -a current_windows=()
-        mapfile -t current_windows < <(wmctrl -lx 2>/dev/null | grep -i "linux-wallpaperengine\|wallpaperengine\|steam_app_431960" | awk '{print $1}' || true)
-        
-        # Look for window not in exclusion list
-        for w in "${current_windows[@]}"; do
-            local is_old=false
-            for old_w in "${exclude_windows[@]}"; do
-                if [[ "$w" == "$old_w" ]]; then
-                    is_old=true
-                    break
-                fi
-            done
-            
-            if [[ "$is_old" == "false" ]]; then
-                log "New window detected: $w"
-                echo "$w"
-                return
-            fi
-        done
-
-        sleep 0.05
-    done
-
-    log "ERROR: Could not find new engine window (timeout after ~10s)"
-    echo ""
+    # Delegate to centralized window waiting utility with 10 second timeout
+    wait_for_new_window 10 "$@"
 }
 
 
 ###############################################
-#  Aplicar flags de ventana
-# apply_window_flags removes the 'above' flag and adds 'skip_pager' and 'below' to the specified window ID, then restores focus to the previously active window if set.
+#  APPLY WINDOW FLAGS (simplified using utility)
+###############################################
 apply_window_flags() {
     local win_id="$1"
 
@@ -306,18 +141,15 @@ apply_window_flags() {
 
     log "Applying window flags to $win_id"
     
-    if wmctrl -i -r "$win_id" -b remove,above 2>/dev/null; then
-        log "Successfully removed 'above' flag"
-    else
-        log "WARNING: Failed to remove 'above' flag"
-    fi
-    
-    wmctrl -i -r "$win_id" -b add,skip_pager 2>/dev/null || log "WARNING: Failed to add 'skip_pager'"
-    wmctrl -i -r "$win_id" -b add,below 2>/dev/null || log "WARNING: Failed to add 'below'"
+    # Use centralized utility for wmctrl flag operations
+    apply_wmctrl_flag "$win_id" "remove" "above"
+    apply_wmctrl_flag "$win_id" "add" "skip_pager"
+    apply_wmctrl_flag "$win_id" "add" "below"
 
+    # Restore focus if we have a previous window
     if [[ -n "$ACTIVE_WIN" ]]; then
         log "Restoring focus to previous window: $ACTIVE_WIN"
-        xdotool windowactivate "$ACTIVE_WIN" 2>/dev/null || log "WARNING: Failed to restore focus"
+        xdotool windowactivate "$ACTIVE_WIN" 2>/dev/null || log_warning "Failed to restore focus"
     fi
 }
 

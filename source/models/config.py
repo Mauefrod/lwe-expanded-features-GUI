@@ -133,6 +133,7 @@ class ConfigUpdater:
             config["--delay"]["active"] = False
             config["--set"]["active"] = False
         ConfigUpdater.update_set_flag(config)
+        ConfigManager.save(config)
 
     @staticmethod
     def set_delay_mode(config, active, timer=None):
@@ -144,6 +145,7 @@ class ConfigUpdater:
             config["--random"] = False
             config["--set"]["active"] = False
         ConfigUpdater.update_set_flag(config)
+        ConfigManager.save(config)
 
     @staticmethod
     def set_window_mode(config, active, resolution=None):
@@ -151,17 +153,69 @@ class ConfigUpdater:
         config["--window"]["active"] = active
         if resolution:
             config["--window"]["res"] = resolution
+        ConfigManager.save(config)
 
     @staticmethod
     def set_above_flag(config, active):
         """Update above flag"""
         config["--above"] = active
+        ConfigManager.save(config)
 
     @staticmethod
     def set_startup(config, active):
         """Update startup flag"""
         config["__run_at_startup__"] = active
-        
-        
-    # You can implement more methods for whatever you need in here ;) 
-    # If you need any tips, refer to the documentation or open an issue
+        ConfigManager.save(config)
+
+    @staticmethod
+    def toggle_above(config):
+        """Toggle above flag value"""
+        config["--above"] = not config.get("--above", False)
+        ConfigManager.save(config)
+
+    @staticmethod
+    def set_window_resolution(config, resolution):
+        """Set window resolution specifically"""
+        if resolution in RESOLUTIONS:
+            config["--window"]["res"] = resolution
+            ConfigManager.save(config)
+
+    @staticmethod
+    def set_pool(config, pool_list):
+        """Update the wallpaper pool"""
+        config["--pool"] = pool_list if pool_list else []
+        ConfigManager.save(config)
+
+    @staticmethod
+    def set_sound_flag(config, flag_name, value):
+        """Update a single sound flag"""
+        valid_flags = ["silent", "noautomute", "no_audio_processing"]
+        if flag_name in valid_flags:
+            config["--sound"][flag_name] = value
+            ConfigManager.save(config)
+
+    @staticmethod
+    def set_sound_flags(config, silent=None, noautomute=None, no_audio_processing=None):
+        """Update sound configuration flags"""
+        if silent is not None:
+            config["--sound"]["silent"] = silent
+        if noautomute is not None:
+            config["--sound"]["noautomute"] = noautomute
+        if no_audio_processing is not None:
+            config["--sound"]["no_audio_processing"] = no_audio_processing
+        ConfigManager.save(config)
+
+    @staticmethod
+    def set_wallpaper(config, wallpaper_id):
+        """Set a specific wallpaper in --set mode"""
+        config["--set"]["active"] = True
+        config["--set"]["wallpaper"] = str(wallpaper_id)
+        config["--random"] = False
+        config["--delay"]["active"] = False
+        ConfigManager.save(config)
+
+    @staticmethod
+    def set_keybindings(config, keybindings_dict):
+        """Update keybindings configuration"""
+        config["--keybindings"] = keybindings_dict
+        ConfigManager.save(config)

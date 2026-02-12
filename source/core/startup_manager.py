@@ -9,11 +9,13 @@ import sys
 import os
 from pathlib import Path
 from datetime import datetime
-from ..common.constants import MAIN_SCRIPT_NAME
+
+# Main script name - needed for startup execution
+MAIN_SCRIPT_NAME = "main.sh"
 
 # This hardcoded values could become an issue if you are working with custom envs. 
 # That being said, the main purpose of the whole "core" module is so that you can 
-# either run the app from the terminal via {MAIN_SCRIPT_NAME} / run.sh or so that when it comes to
+# either run the app from the terminal via main.sh / run.sh or so that when it comes to
 # coding you don't need to change the constants in the files, so consider this a burden
 # you have to bear when it comes to development.
 # Either that or refactor those modules or the constants... in which case, they are not 
@@ -178,35 +180,32 @@ def run_at_startup():
     log("[STARTUP] =========================================================")
 
     try:
-        result = subprocess.run(
+        # Use Popen with preexec_fn to detach the process as a background daemon
+        # This allows the startup handler to exit immediately while the engine runs
+        process = subprocess.Popen(
             cmd,
-            check=False,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
-            cwd=str(CORE_DIR)
+            cwd=str(CORE_DIR),
+            start_new_session=True  # Detach from parent process group
         )
 
-        if result.stdout:
-            log(f"[STARTUP] Output:\n{result.stdout}")
-        if result.stderr:
-            log(f"[STARTUP] Stderr:\n{result.stderr}")
-
-        if result.returncode == 0:
-            log("[STARTUP] Wallpaper engine started successfully")
+        # Give it a moment to start and read any immediate output/errors
+        try:
+            stdout, stderr = process.communicate(timeout=2)
+            if stdout:
+                log(f"[STARTUP] Output:\n{stdout}")
+            if stderr:
+                log(f"[STARTUP] Stderr:\n{stderr}")
+        except subprocess.TimeoutExpired:
+            # Process is still running (expected for daemon behavior)
+            log("[STARTUP] Wallpaper engine launched successfully in background")
             return
-        else:
-            log(f"[WARNING] Command exited with code {result.returncode}")
-            log("[WARNING] This may be normal if the engine daemonizes")
-            return
 
-    except subprocess.CalledProcessError as e:
-        log(f"[ERROR] Failed to run wallpaper engine")
-        log(f"[ERROR] Return code: {e.returncode}")
-        if e.stdout:
-            log(f"[ERROR] Stdout: {e.stdout}")
-        if e.stderr:
-            log(f"[ERROR] Stderr: {e.stderr}")
-        sys.exit(1)
+        log("[STARTUP] Wallpaper engine started successfully")
+        return
+
     except FileNotFoundError:
         log(f"[FATAL ERROR] Script not found: {main_script}")
         sys.exit(1)

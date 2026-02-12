@@ -1,5 +1,6 @@
 from tkinter import Toplevel, Label, Entry, Button, Frame, Listbox, ttk
 from gui.groups import create_group, add_to_group, remove_from_group, in_group
+from common.constants import UI_COLORS
 
 
 class DialogManager:
@@ -24,10 +25,10 @@ class DialogManager:
         win = Toplevel(self.parent)
         win.title("New group")
         win.geometry("250x120")
-        win.config(bg="#0a0e27")
+        win.config(bg=UI_COLORS["bg_secondary"])
 
-        Label(win, text="Group name:", bg="#0a0e27", fg="#00d4ff", font=("Arial", 10, "bold")).pack(pady=5)
-        entry = Entry(win, bg="#1a2f4d", fg="#00d4ff", insertbackground="#00d4ff", font=("Arial", 10))
+        Label(win, text="Group name:", bg=UI_COLORS["bg_secondary"], fg=UI_COLORS["accent_cyan"], font=("Arial", 10, "bold")).pack(pady=5)
+        entry = Entry(win, bg=UI_COLORS["text_input_bg"], fg=UI_COLORS["accent_cyan"], insertbackground=UI_COLORS["accent_cyan"], font=("Arial", 10))
         entry.pack(pady=5)
         entry.focus()
 
@@ -46,7 +47,7 @@ class DialogManager:
             create()
 
         entry.bind("<Return>", on_enter)
-        Button(win, text="CREATE", bg="#00d4ff", fg="#0a0e27", font=("Arial", 10, "bold"), activebackground="#00ffff", activeforeground="#0a0e27", bd=2, relief="raised", cursor="hand2", command=create).pack(pady=10)
+        Button(win, text="CREATE", bg=UI_COLORS["accent_cyan"], fg=UI_COLORS["bg_secondary"], font=("Arial", 10, "bold"), activebackground=UI_COLORS["accent_cyan_bright"], activeforeground=UI_COLORS["bg_secondary"], bd=2, relief="raised", cursor="hand2", command=create).pack(pady=10)
 
     def show_assign_groups_dialog(self, wallpaper_id, on_closed=None):
         """

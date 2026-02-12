@@ -1,13 +1,16 @@
 from tkinter import Menu
-from gui.groups import is_favorite, in_group
+from models.groups import GroupManager
+from common.constants import UI_COLORS
 
 
 class ContextMenuManager:
     """Manages context menus for wallpaper and group selections throughout the application"""
 
-    def __init__(self, parent, config):
+    def __init__(self, parent, config, group_manager=None):
         self.parent = parent
         self.config = config
+        # Use injected group manager or create one
+        self.group_manager = group_manager or GroupManager(config)
 
     def show_wallpaper_menu(self, event, wallpaper_id, callbacks):
         """
@@ -19,10 +22,10 @@ class ContextMenuManager:
         - on_add_to_group: function that receives (group, wallpaper_id)
         - on_mark_not_working: function that receives wallpaper_id
         """
-        menu = Menu(self.parent, tearoff=0, bg="#1a2f4d", fg="#00d4ff", activebackground="#00d4ff", activeforeground="#0a0e27")
+        menu = Menu(self.parent, tearoff=0, bg=UI_COLORS["text_input_bg"], fg=UI_COLORS["accent_cyan"], activebackground=UI_COLORS["accent_cyan"], activeforeground=UI_COLORS["bg_secondary"])
 
 
-        if is_favorite(self.config, wallpaper_id):
+        if self.group_manager.is_favorite(wallpaper_id):
             menu.add_command(
                 label="Remove from favorites",
                 command=lambda: callbacks['on_toggle_favorite'](wallpaper_id)
@@ -36,7 +39,7 @@ class ContextMenuManager:
         menu.add_separator()
 
 
-        if in_group(self.config, "not working", wallpaper_id):
+        if self.group_manager.in_group("not working", wallpaper_id):
             menu.add_command(
                 label="Remove from not working",
                 command=lambda: callbacks['on_mark_not_working'](wallpaper_id)
@@ -56,8 +59,8 @@ class ContextMenuManager:
         )
 
 
-        groups_menu = Menu(menu, tearoff=0, bg="#1a2f4d", fg="#00d4ff", activebackground="#00d4ff", activeforeground="#0a0e27")
-        groups = [g for g in self.config["--groups"].keys() if g != "not working"]
+        groups_menu = Menu(menu, tearoff=0, bg=UI_COLORS["text_input_bg"], fg=UI_COLORS["accent_cyan"], activebackground=UI_COLORS["accent_cyan"], activeforeground=UI_COLORS["bg_secondary"])
+        groups = [g for g in self.group_manager.get_all_groups() if g != "not working"]
 
         if groups:
             for g in groups:
@@ -78,7 +81,7 @@ class ContextMenuManager:
         
         on_delete: function that receives group_id
         """
-        menu = Menu(self.parent, tearoff=0, bg="#1a2f4d", fg="#000000", activebackground="#661111", activeforeground="#ffffff")
+        menu = Menu(self.parent, tearoff=0, bg=UI_COLORS["text_input_bg"], fg=UI_COLORS["fg_text_dark"], activebackground=UI_COLORS["danger_dark"], activeforeground=UI_COLORS["fg_text"])
 
         if group_id not in ("__ALL__", "__FAVORITES__", "not working"):
             menu.add_command(

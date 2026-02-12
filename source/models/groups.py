@@ -125,7 +125,8 @@ class GroupManager:
         from shutil import rmtree
 
         wallpaper_dir = self.config.get("--dir")
-        not_working_list = self.config.get("--groups", {}).get("not working", [])
+        groups = self.config.get("--groups", {})
+        not_working_list = groups.get("not working", [])
 
         if not wallpaper_dir:
             self.logger.component("GROUPS", "No wallpaper directory configured", "WARNING")
@@ -140,19 +141,26 @@ class GroupManager:
 
         deleted_count = 0
         for wallpaper_id in not_working_list:
-            wallpaper_path = path.join(wallpaper_dir, str(wallpaper_id))
+            try:
+                wallpaper_path = path.join(wallpaper_dir, str(wallpaper_id))
 
-            if path.exists(wallpaper_path) and path.isdir(wallpaper_path):
-                try:
-                    rmtree(wallpaper_path)
-                    deleted_count += 1
-                    self.logger.component("GROUPS", f"Deleted wallpaper: {wallpaper_id}")
-                except Exception as e:
-                    self.logger.component("GROUPS", f"Error deleting wallpaper {wallpaper_id}: {e}", "ERROR")
-            else:
-                self.logger.component("GROUPS", f"Wallpaper not found: {wallpaper_id}", "WARNING")
+                if path.exists(wallpaper_path) and path.isdir(wallpaper_path):
+                    try:
+                        rmtree(wallpaper_path)
+                        deleted_count += 1
+                        self.logger.component("GROUPS", f"Deleted wallpaper: {wallpaper_id}")
+                    except Exception as e:
+                        self.logger.component("GROUPS", f"Error deleting wallpaper {wallpaper_id}: {e}", "ERROR")
+                else:
+                    self.logger.component("GROUPS", f"Wallpaper not found: {wallpaper_id}", "WARNING")
+            except Exception as e:
+                self.logger.component("GROUPS", f"Error processing wallpaper {wallpaper_id}: {e}", "ERROR")
+                continue
 
-
+        # Ensure --groups exists and has "not working" key before clearing it
+        if "not working" not in self.config.get("--groups", {}):
+            self.config["--groups"] = self.config.get("--groups", {})
+        
         self.config["--groups"]["not working"] = []
         ConfigManager.save(self.config)
         self.logger.component("GROUPS",

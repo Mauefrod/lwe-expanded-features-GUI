@@ -1,19 +1,21 @@
-from gui.wallpaper_loader import THUMB_SIZE
+from common.constants import THUMB_SIZE
 from gui.gallery_view.thumbnails import ThumbnailFactory
 from gui.gallery_view.context_menus import ContextMenuManager
 from gui.gallery_view.dialogs import DialogManager
-from gui.groups import toggle_favorite, add_to_group, delete_group, in_group, remove_from_group
+from models.groups import GroupManager
 
 
 class GalleryView:
     """Manages gallery display for wallpapers and groups"""
 
-    def __init__(self, canvas, inner_frame, config, loader, log_callback=None):
+    def __init__(self, canvas, inner_frame, config, loader, log_callback=None, group_manager=None):
         self.canvas = canvas
         self.inner_frame = inner_frame
         self.config = config
         self.loader = loader
         self.log_callback = log_callback
+        # Use injected group manager or create one
+        self.group_manager = group_manager or GroupManager(config)
 
 
         self.item_list = []
@@ -28,11 +30,11 @@ class GalleryView:
 
 
         self.thumbnails = ThumbnailFactory(inner_frame, config)
-        self.context_menu_manager = ContextMenuManager(canvas, config)
+        self.context_menu_manager = ContextMenuManager(canvas, config, self.group_manager)
         self.dialog_manager = DialogManager(canvas, config, log_callback)
 
 
-        self.on_wallpaper_applied = None
+        self.on_wallpaper_applied = None # placeholders for event_handler for future implementation
         self.on_refresh_needed = None
 
     def log(self, message: str) -> None:
@@ -74,6 +76,7 @@ class GalleryView:
             on_right_click=self._handle_wallpaper_right_click
         )
         self.thumbnail_widgets[index] = frame
+        print(f"[GalleryView] Created thumbnail for wallpaper '{wallpaper_id}' at index {index} (row {row}, col {col})")
 
 
 
@@ -90,15 +93,13 @@ class GalleryView:
         """Open a group to display its wallpapers"""
         self.current_view = "wallpapers"
         self.current_group = group_id
-        if self.on_refresh_needed:
-            self.on_refresh_needed()
+        self._trigger_refresh()
 
     def go_back(self):
-        """Vuelve a la vista de grupos"""
+        """Return to the groups view"""
         self.current_view = "groups"
         self.current_group = None
-        if self.on_refresh_needed:
-            self.on_refresh_needed()
+        self._trigger_refresh()
 
 
 
@@ -127,36 +128,37 @@ class GalleryView:
 
 
 
-    def _toggle_favorite_and_refresh(self, wallpaper_id):
-        """Toggle wallpaper favorite status and refresh gallery display"""
-        toggle_favorite(self.config, wallpaper_id)
+    def _trigger_refresh(self) -> None:
+        """Helper to trigger gallery refresh if callback is set"""
         if self.on_refresh_needed:
             self.on_refresh_needed()
+
+    def _toggle_favorite_and_refresh(self, wallpaper_id):
+        """Toggle wallpaper favorite status and refresh gallery display"""
+        self.group_manager.toggle_favorite(wallpaper_id)
+        self._trigger_refresh()
 
     def _toggle_not_working_and_refresh(self, wallpaper_id):
         """Toggle wallpaper 'not working' status and refresh gallery display"""
-        if in_group(self.config, "not working", wallpaper_id):
-            remove_from_group(self.config, "not working", wallpaper_id)
+        if self.group_manager.in_group("not working", wallpaper_id):
+            self.group_manager.remove_from_group("not working", wallpaper_id)
             self.log(f"[GUI] Removed {wallpaper_id} from 'not working'")
         else:
-            add_to_group(self.config, "not working", wallpaper_id)
+            self.group_manager.add_to_group("not working", wallpaper_id)
             self.log(f"[GUI] Added {wallpaper_id} to 'not working'")
-        if self.on_refresh_needed:
-            self.on_refresh_needed()
+        self._trigger_refresh()
 
     def _add_to_group_and_refresh(self, group, wallpaper_id):
         """Add wallpaper to group and refresh gallery display"""
-        add_to_group(self.config, group, wallpaper_id)
+        self.group_manager.add_to_group(group, wallpaper_id)
         self.log(f"[GUI] Added {wallpaper_id} to group '{group}'")
-        if self.on_refresh_needed:
-            self.on_refresh_needed()
+        self._trigger_refresh()
 
     def _delete_group_and_refresh(self, group_id):
         """Delete group and refresh gallery display"""
-        delete_group(self.config, group_id)
+        self.group_manager.delete_group(group_id)
         self.log(f"[GUI] Deleted group '{group_id}'")
-        if self.on_refresh_needed:
-            self.on_refresh_needed()
+        self._trigger_refresh()
 
     def _show_assign_groups_dialog(self, wallpaper_id):
         """Display dialog for assigning wallpaper to groups"""
